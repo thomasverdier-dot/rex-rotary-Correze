@@ -1,7 +1,7 @@
 (()=>{
   const API='https://recherche-entreprises.api.gouv.fr/search';
   const EFFECTIFS={NN:'Non employeur', '00':'0 salarié','01':'1 à 2','02':'3 à 5','03':'6 à 9','11':'10 à 19','12':'20 à 49','21':'50 à 99','22':'100 à 199','31':'200 à 249','32':'250 à 499','41':'500 à 999','42':'1 000 à 1 999','51':'2 000 à 4 999','52':'5 000 à 9 999','53':'10 000 et +'};
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
   function getProfile(){try{return profile}catch(e){return null}}
   function getOwnCp(cp){try{return typeof ownCp==='function'?ownCp(String(cp)):true}catch(e){return true}}
@@ -74,23 +74,46 @@
     return true;
   }
   const rank={'NN':0,'00':0,'01':1,'02':3,'03':6,'11':10,'12':20,'21':50,'22':100,'31':200,'32':250,'41':500,'42':1000,'51':2000,'52':5000,'53':10000};
+
+  async function apiPage(base,page){
+    const params=new URLSearchParams(base);params.set('page',String(page));params.set('per_page','25');
+    const r=await fetch(API+'?'+params.toString());if(!r.ok)throw new Error('Erreur API '+r.status);return r.json();
+  }
+
   async function search(){
     const q=document.getElementById('proQ').value.trim(),place=document.getElementById('proPlace').value.trim(),ape=document.getElementById('proApe').value.trim().toUpperCase().replace(/\./g,''),minCode=document.getElementById('proEffectif').value,phoneOnly=document.getElementById('proPhoneOnly').checked;
     if(!q&&!place&&!ape){proStatus.textContent='Renseigne au moins un nom/SIREN, une commune/code postal ou un code APE.';return}
     proStatus.textContent='Recherche des sièges sociaux en cours…';proBody.innerHTML='<tr><td colspan="8" class="pro-empty">Chargement…</td></tr>';
     try{
-      const params=new URLSearchParams({page:'1',per_page:'25',etat_administratif:'A'});
-      if(q){const digits=q.replace(/\s/g,'');params.set('q',/^\d{9}$/.test(digits)?'siren:'+digits:q)}
-      if(/^\d{5}$/.test(place))params.set('code_postal',place);
-      if(ape)params.set('code_naf',ape.length===5?ape.slice(0,2)+'.'+ape.slice(2):ape);
-      const r=await fetch(API+'?'+params.toString());if(!r.ok)throw new Error('Erreur API '+r.status);const d=await r.json();let rows=(d.results||[]).filter(allowedHeadOffice);
-      if(/^\d{5}$/.test(place))rows=rows.filter(x=>cpOf(x)===place);
-      if(place&&!/^\d{5}$/.test(place)){const p=norm(place);rows=rows.filter(x=>norm(cityOf(x)).includes(p)||norm(addressOf(x)).includes(p))}
+      const isCp=/^\d{5}$/.test(place);
+      const base={etat_administratif:'A'};
+      if(q){const digits=q.replace(/\s/g,'');base.q=/^\d{9}$/.test(digits)?'siren:'+digits:q}
+      if(isCp)base.code_postal=place;
+      if(ape)base.code_naf=ape.length===5?ape.slice(0,2)+'.'+ape.slice(2):ape;
+
+      let raw=[];
+      if(isCp){
+        let page=1,totalPages=1;
+        do{
+          proStatus.textContent=`Recherche des sièges sociaux du ${place}… page ${page}`;
+          const d=await apiPage(base,page);
+          raw.push(...(d.results||[]));
+          totalPages=Math.min(Number(d.total_pages||1),20);
+          page++;
+        }while(page<=totalPages && raw.filter(x=>allowedHeadOffice(x)&&cpOf(x)===place).length<100);
+      }else{
+        const d=await apiPage(base,1);raw=d.results||[];
+      }
+
+      const dedup=new Map();raw.forEach(x=>{if(x?.siren)dedup.set(x.siren,x)});
+      let rows=[...dedup.values()].filter(allowedHeadOffice);
+      if(isCp)rows=rows.filter(x=>cpOf(x)===place);
+      if(place&&!isCp){const p=norm(place);rows=rows.filter(x=>norm(cityOf(x)).includes(p)||norm(addressOf(x)).includes(p))}
       if(ape)rows=rows.filter(x=>apeOf(x)===ape);
       if(minCode){const min=rank[minCode]||0;rows=rows.filter(x=>(rank[effectifCodeOf(x)]||0)>=min)}
       if(phoneOnly)rows=rows.filter(x=>!!phoneOf(x));
       const p=getProfile();
-      proStatus.textContent=`${rows.length} siège${rows.length>1?'s':''} social${rows.length>1?'aux':''}${p?.role==='seller'?' sur ton secteur':' sur le territoire'}.`;
+      proStatus.textContent=`${rows.length} siège${rows.length>1?'s':''} social${rows.length>1?'aux':''}${isCp?' dans le '+place:(p?.role==='seller'?' sur ton secteur':' sur le territoire')}.`;
       proBody.innerHTML=rows.length?rows.map(x=>{
         const name=x.nom_complet||x.nom_raison_sociale||x.denomination||'Entreprise',phone=phoneOf(x),ape=apeOf(x),apeLabel=apeLabelOf(x);
         return `<tr><td><b class="pro-name">${esc(name)}</b><br><span style="color:#64748b">${esc(cityOf(x))}</span></td><td>${esc(x.siren||'—')}</td><td>${esc(effectifOf(x))}</td><td class="pro-ape"><b>${esc(ape||'—')}</b>${apeLabel?'<br><span style="color:#64748b">'+esc(apeLabel)+'</span>':''}</td><td>${esc(addressOf(x)||'Non renseignée')}</td><td>${esc(leadersOf(x))}</td><td>${phone?'<span class="pro-phone">'+esc(phone)+'</span>':'Non disponible'}</td><td><div class="pro-actions"><a href="${annuaireUrl(x)}" target="_blank" rel="noopener">Fiche officielle</a><a class="phone" href="${webPhoneUrl(x)}" target="_blank" rel="noopener">${phone?'Vérifier':'Trouver'} téléphone</a></div></td></tr>`
