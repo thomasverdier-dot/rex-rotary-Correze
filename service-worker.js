@@ -1,11 +1,12 @@
-const APP_CACHE = "rex-correze-app-v4";
+const APP_CACHE = "rex-correze-app-v5";
 const DATA_CACHE = "rex-correze-data-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon.svg",
-  "./admin-seller.js"
+  "./admin-seller.js",
+  "./weekly-forecast.js"
 ];
 
 self.addEventListener("install", event=>{
@@ -20,12 +21,15 @@ self.addEventListener("activate", event=>{
   self.clients.claim();
 });
 
-async function injectAdminModule(response){
+async function injectModules(response){
   try{
     const type=response.headers.get('content-type')||'';
     if(!type.includes('text/html')) return response;
     let html=await response.text();
-    if(!html.includes('admin-seller.js')) html=html.replace('</body>','<script src="./admin-seller.js?v=4"></script></body>');
+    const tags=[];
+    if(!html.includes('admin-seller.js')) tags.push('<script src="./admin-seller.js?v=5"></script>');
+    if(!html.includes('weekly-forecast.js')) tags.push('<script src="./weekly-forecast.js?v=1"></script>');
+    if(tags.length) html=html.replace('</body>',tags.join('')+'</body>');
     const headers=new Headers(response.headers);
     headers.delete('content-length');
     return new Response(html,{status:response.status,statusText:response.statusText,headers});
@@ -48,10 +52,10 @@ self.addEventListener("fetch", event=>{
       try{
         const fresh=await fetch(req,{cache:'no-store'});
         const copy=fresh.clone();caches.open(APP_CACHE).then(c=>c.put('./index.html',copy)).catch(()=>{});
-        return injectAdminModule(fresh);
+        return injectModules(fresh);
       }catch(e){
         const cached=await caches.match('./index.html')||await caches.match(req);
-        return cached?injectAdminModule(cached):Response.error();
+        return cached?injectModules(cached):Response.error();
       }
     })());
     return;
