@@ -1,4 +1,4 @@
-const APP_CACHE = "rex-correze-app-v8";
+const APP_CACHE = "rex-correze-app-v9";
 const DATA_CACHE = "rex-correze-data-v1";
 const APP_SHELL = [
   "./",
@@ -29,7 +29,7 @@ async function injectModules(response){
     if(!type.includes('text/html')) return response;
     let html=await response.text();
     const tags=[];
-    if(!html.includes('admin-seller.js')) tags.push('<script src="./admin-seller.js?v=8"></script>');
+    if(!html.includes('admin-seller.js')) tags.push('<script src="./admin-seller.js?v=9"></script>');
     if(!html.includes('weekly-forecast.js')) tags.push('<script src="./weekly-forecast.js?v=2"></script>');
     if(!html.includes('ui-v3.js')) tags.push('<script src="./ui-v3.js?v=1"></script>');
     if(!html.includes('map-companies.js')) tags.push('<script src="./map-companies.js?v=2"></script>');
