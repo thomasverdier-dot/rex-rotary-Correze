@@ -5,6 +5,18 @@
     return null;
   }
   function getClient(){ try{ if(typeof sb!=='undefined' && sb) return sb; }catch(e){} return null; }
+
+  async function readableFunctionError(error){
+    try{
+      if(error?.context && typeof error.context.json==='function'){
+        const body=await error.context.clone().json();
+        if(body?.error) return body.error;
+        if(body?.message) return body.message;
+      }
+    }catch(e){}
+    return error?.message || 'Impossible de créer le vendeur.';
+  }
+
   function mount(){
     if(document.getElementById('rexSellerAdmin')) return;
     const p=getProfile();
@@ -56,10 +68,14 @@
       btn.disabled=true;msg.className='rex-msg';msg.textContent='Création du vendeur…';
       try{
         const {data,error}=await client.functions.invoke('admin-create-seller',{body:{display_name,email,password,sector_id}});
-        if(error) throw error;if(data?.error) throw new Error(data.error);
+        if(error) throw error;
+        if(data?.error) throw new Error(data.error);
         msg.className='rex-msg rex-ok';msg.textContent='✓ '+display_name+' créé — Secteur '+sector_id+'.';
         box.querySelector('#rexSellerName').value='';box.querySelector('#rexSellerEmail').value='';box.querySelector('#rexSellerPassword').value='';box.querySelector('#rexSellerSector').value='';
-      }catch(e){msg.className='rex-msg rex-error';msg.textContent=e?.message||'Impossible de créer le vendeur.';}finally{btn.disabled=false;}
+      }catch(e){
+        msg.className='rex-msg rex-error';
+        msg.textContent=await readableFunctionError(e);
+      }finally{btn.disabled=false;}
     });
   }
   let tries=0;const timer=setInterval(()=>{tries++;mount();if(document.getElementById('rexSellerAdmin')||tries>80)clearInterval(timer)},250);
