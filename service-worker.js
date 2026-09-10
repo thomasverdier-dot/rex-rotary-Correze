@@ -1,4 +1,4 @@
-const APP_CACHE = "rex-correze-app-v10";
+const APP_CACHE = "rex-correze-app-v11";
 const DATA_CACHE = "rex-correze-data-v1";
 const APP_SHELL = [
   "./",
@@ -8,7 +8,8 @@ const APP_SHELL = [
   "./admin-seller.js",
   "./weekly-forecast.js",
   "./ui-v3.js",
-  "./map-companies.js"
+  "./map-companies.js",
+  "./prospection.js"
 ];
 
 self.addEventListener("install", event=>{
@@ -33,6 +34,7 @@ async function injectModules(response){
     if(!html.includes('weekly-forecast.js')) tags.push('<script src="./weekly-forecast.js?v=3"></script>');
     if(!html.includes('ui-v3.js')) tags.push('<script src="./ui-v3.js?v=1"></script>');
     if(!html.includes('map-companies.js')) tags.push('<script src="./map-companies.js?v=2"></script>');
+    if(!html.includes('prospection.js')) tags.push('<script src="./prospection.js?v=1"></script>');
     if(tags.length) html=html.replace('</body>',tags.join('')+'</body>');
     const headers=new Headers(response.headers);
     headers.delete('content-length');
