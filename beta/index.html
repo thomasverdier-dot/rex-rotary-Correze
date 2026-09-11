@@ -18,10 +18,11 @@ html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;backgro
     if(!r.ok)throw new Error('Impossible de charger la base V16 (HTTP '+r.status+').');
     let html=await r.text();
 
-    // La bêta ne doit pas enregistrer de service worker ni devenir une PWA.
+    // La bêta reste sans service worker pour éviter les anciens problèmes de cache.
     html=html.replace(/<link\s+rel=["']manifest["'][^>]*>/i,'');
     html=html.replace(/href=["']icon\.svg["']/i,'href="../icon.svg"');
     html=html.replace(/if\('serviceWorker'in navigator\)window\.addEventListener\('load',\(\)=>navigator\.serviceWorker\.register\('\.\/service-worker\.js'\)\.catch\(\(\)=>\{\}\)\);?/g,'');
+    html=html.replace('</head>','<link rel="manifest" href="./manifest.webmanifest"><meta name="application-name" content="Rex-Rotary Corrèze"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Rex Corrèze"></head>');
 
     // Socle V16, puis modules bêta isolés et chargés dans un ordre fixe.
     const modules=[
