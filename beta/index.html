@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rex-Rotary Corrèze — Bêta propre</title>
+<style>
+html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;background:#edf2f7;color:#14243b}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.boot-card{background:#fff;border:1px solid #d9e2ec;border-radius:18px;padding:24px;box-shadow:0 20px 60px rgba(20,36,59,.12);max-width:520px;width:100%}.boot-card h1{margin:0 0 8px;color:#0e2f68}.boot-card p{margin:0;color:#667085}.boot-error{color:#b42318;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="boot"><div class="boot-card"><h1>Rex-Rotary Corrèze</h1><p id="bootMsg">Chargement de la bêta propre…</p></div></div>
+<script>
+(async()=>{
+  const msg=document.getElementById('bootMsg');
+  try{
+    const r=await fetch('../index.html?beta_source='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw new Error('Impossible de charger la base V16 (HTTP '+r.status+').');
+    let html=await r.text();
+
+    // La bêta ne doit pas enregistrer de service worker ni devenir une PWA.
+    html=html.replace(/<link\s+rel=["']manifest["'][^>]*>/i,'');
+    html=html.replace(/href=["']icon\.svg["']/i,'href="../icon.svg"');
+    html=html.replace(/if\('serviceWorker'in navigator\)window\.addEventListener\('load',\(\)=>navigator\.serviceWorker\.register\('\.\/service-worker\.js'\)\.catch\(\(\)=>\{\}\)\);?/g,'');
+
+    // Modules V16 chargés explicitement et dans un ordre fixe.
+    const modules=[
+      '../admin-seller.js?v=9',
+      '../weekly-forecast.js?v=3',
+      '../monthly-forecast.js?v=1',
+      '../ui-v3.js?v=2',
+      '../map-companies.js?v=2',
+      '../prospection.js?v=4',
+      '../tickets.js?v=1'
+    ];
+    const tags=modules.map(src=>'<script src="'+src+'"><\\/script>').join('');
+    html=html.replace('</body>',tags+'</body>');
+
+    // Marqueur visuel discret pour ne jamais confondre la bêta avec la V16 stable.
+    html=html.replace('</body>','<div style="position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial">BÊTA SANS SERVICE WORKER</div></body>');
+
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(e){
+    msg.className='boot-error';
+    msg.textContent='Erreur de chargement : '+(e?.message||e);
+  }
+})();
+</script>
+</body>
+</html>
