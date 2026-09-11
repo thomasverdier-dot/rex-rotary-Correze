@@ -1,5 +1,6 @@
 (()=>{
   const SECTORS=[1,2,3,4];
+  const MONTHS=['Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre','Janvier','Février','Mars'];
   let sellers=[],targets=new Map(),monthly=[],agency={ca_target:0,nc_target:0,upcross_target:0},loadedYear=null,busy=false;
   const n=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)&&x>=0?x:0};
   const fmt=v=>n(v).toLocaleString('fr-FR',{maximumFractionDigits:2});
@@ -7,24 +8,35 @@
   function getSb(){try{return sb}catch(e){return null}}
   function getUser(){try{return user||currentUser||null}catch(e){return null}}
   function year(){return Number(document.getElementById('fstYear')?.value||new Date().getFullYear())}
+  function monthIndex(){return Number(document.getElementById('fstMonth')?.value||1)}
   function target(sec){return targets.get(Number(sec))||{ca_target:0,nc_target:0,upcross_target:0}}
   function remain(t,d){return Math.max(0,n(t)-n(d))}
   function pct(d,t){return n(t)>0?Math.round(n(d)/n(t)*100):0}
   function totals(rows){return{ca:rows.reduce((a,r)=>a+n(r.ca),0),nc:rows.reduce((a,r)=>a+n(r.nc),0),upcross:rows.reduce((a,r)=>a+n(r.upcross),0)}}
   function sectorTotals(sec){return totals(monthly.filter(r=>Number(r.sector_id)===Number(sec)))}
-  function sellerTotals(uid){return totals(monthly.filter(r=>r.user_id===uid))}
+  function agencyTotals(){return totals(monthly)}
+  function monthRow(sec,mi){return monthly.find(r=>Number(r.sector_id)===Number(sec)&&Number(r.month_index)===Number(mi))||{ca:0,nc:0,upcross:0}}
   function assigned(sec){return sellers.filter(s=>Number(s.sector_id)===Number(sec))}
   function metric(done,t){const r=remain(t,done),p=pct(done,t);return `<td>${fmt(done)}</td><td>${fmt(t)}</td><td class="${r===0?'fst-ok':'fst-remain'}">${fmt(r)}</td><td>${p}%</td>`}
 
-  function addStyle(){if(document.getElementById('fiscalSectorStyle'))return;const s=document.createElement('style');s.id='fiscalSectorStyle';s.textContent=`.fst-sector-empty{color:#94a3b8;font-style:italic}.fst-sector-note{margin-top:6px;color:#64748b;font-size:10px}`;document.head.appendChild(s)}
+  function addStyle(){if(document.getElementById('fiscalSectorStyle'))return;const s=document.createElement('style');s.id='fiscalSectorStyle';s.textContent=`
+    .fst-sector-empty{color:#94a3b8;font-style:italic}.fst-sector-note{margin-top:6px;color:#64748b;font-size:10px}
+    .fst-sector-month-row td:first-child{min-width:180px}.fst-sector-month-row input{width:100px}
+  `;document.head.appendChild(s)}
 
   function ensureSectorCard(){
     const page=document.getElementById('rexFiscalSalesPage');if(!page)return null;
     let card=document.getElementById('fstSectorCard');if(card)return card;
     card=document.createElement('div');card.id='fstSectorCard';card.className='fst-card';
-    card.innerHTML=`<h3>🗺️ Récapitulatif par secteur</h3><div class="fst-sub">Les secteurs 1 à 4 conservent leurs objectifs même sans vendeur affecté. L’affectation d’un vendeur lui fait automatiquement hériter de l’objectif du secteur.</div><div class="fst-table-wrap"><table class="fst-table"><thead><tr><th rowspan="2">Secteur / affectation</th><th colspan="4">CA</th><th colspan="4">NC</th><th colspan="4">UP/CROSS</th></tr><tr><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th></tr></thead><tbody id="fstSectorSummaryBody"></tbody></table></div>`;
+    card.innerHTML=`<h3>🗺️ Récapitulatif par secteur</h3><div class="fst-sub">Les secteurs 1 à 4 conservent leurs objectifs même sans vendeur affecté. L’affectation d’un vendeur lui fait automatiquement hériter de l’objectif et du réalisé du secteur.</div><div class="fst-table-wrap"><table class="fst-table"><thead><tr><th rowspan="2">Secteur / affectation</th><th colspan="4">CA</th><th colspan="4">NC</th><th colspan="4">UP/CROSS</th></tr><tr><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th><th>Réalisé</th><th>Objectif</th><th>Reste</th><th>%</th></tr></thead><tbody id="fstSectorSummaryBody"></tbody></table></div>`;
     const agencyCard=document.getElementById('fstAgencyKpis')?.closest('.fst-card');
     agencyCard?.insertAdjacentElement('afterend',card);return card;
+  }
+
+  function renderAgency(){
+    const el=document.getElementById('fstAgencyKpis');if(!el)return;const d=agencyTotals();
+    const k=(label,done,t)=>{const p=pct(done,t),r=remain(t,done);return `<div class="fst-kpi"><b>${label}</b><strong>${fmt(done)} / ${fmt(t)}</strong><small>Reste à faire : <span class="${r===0?'fst-ok':'fst-remain'}">${fmt(r)}</span> · ${p}% atteint</small><div class="fst-bar"><i style="width:${Math.min(100,p)}%"></i></div></div>`};
+    el.innerHTML=k('CA',d.ca,agency.ca_target)+k('NC',d.nc,agency.nc_target)+k('UP/CROSS',d.upcross,agency.upcross_target);
   }
 
   function renderSectorSummary(){
@@ -34,7 +46,14 @@
 
   function renderSellerSummary(){
     const body=document.getElementById('fstSummaryBody');if(!body)return;
-    body.innerHTML=sellers.map(s=>{const d=sellerTotals(s.user_id),t=target(s.sector_id);return `<tr data-sector-aware="1"><td><b>${esc(s.display_name||'Vendeur')}</b>${s.sector_id?`<br><span style="color:#64748b">Objectif Secteur ${esc(s.sector_id)}</span>`:'<br><span class="fst-sector-empty">Aucun secteur affecté</span>'}</td>${metric(d.ca,t.ca_target)}${metric(d.nc,t.nc_target)}${metric(d.upcross,t.upcross_target)}</tr>`}).join('')||'<tr data-sector-aware="1"><td colspan="13">Aucun vendeur.</td></tr>';
+    body.innerHTML=sellers.map(s=>{const d=s.sector_id?sectorTotals(s.sector_id):{ca:0,nc:0,upcross:0},t=target(s.sector_id);return `<tr data-sector-aware="1"><td><b>${esc(s.display_name||'Vendeur')}</b>${s.sector_id?`<br><span style="color:#64748b">Secteur ${esc(s.sector_id)} · objectif et réalisé du secteur</span>`:'<br><span class="fst-sector-empty">Aucun secteur affecté</span>'}</td>${metric(d.ca,t.ca_target)}${metric(d.nc,t.nc_target)}${metric(d.upcross,t.upcross_target)}</tr>`}).join('')||'<tr data-sector-aware="1"><td colspan="13">Aucun vendeur.</td></tr>';
+  }
+
+  function renderMonth(){
+    const body=document.getElementById('fstMonthBody');if(!body)return;const mi=monthIndex();
+    const head=body.closest('table')?.querySelector('thead tr');if(head)head.innerHTML='<th>Secteur / affectation</th><th>CA</th><th>NC</th><th>UP/CROSS</th>';
+    body.innerHTML=SECTORS.map(sec=>{const r=monthRow(sec,mi),names=assigned(sec).map(s=>s.display_name||'Vendeur').join(', ');return `<tr class="fst-sector-month-row" data-sector="${sec}"><td><b>Secteur ${sec}</b><br>${names?`<span style="color:#64748b">${esc(names)}</span>`:'<span class="fst-sector-empty">Non affecté</span>'}</td><td><input data-field="ca" inputmode="decimal" value="${esc(fmt(r.ca))}"></td><td><input data-field="nc" inputmode="decimal" value="${esc(fmt(r.nc))}"></td><td><input data-field="upcross" inputmode="decimal" value="${esc(fmt(r.upcross))}"></td></tr>`}).join('');
+    const sub=body.closest('.fst-card')?.querySelector('.fst-sub');if(sub)sub.textContent=`${MONTHS[mi-1]} : saisis CA, NC et UP/CROSS pour les 4 secteurs, même si un secteur est temporairement non affecté.`;
   }
 
   function renderTargets(){
@@ -45,6 +64,16 @@
     const sub=document.querySelector('#fstTargetsDetails .fst-sub');if(sub)sub.textContent='Les objectifs sont enregistrés par secteur. S3 et S4 restent disponibles même sans vendeur affecté.';
   }
 
+  async function saveMonth(){
+    const client=getSb(),u=getUser(),body=document.getElementById('fstMonthBody');if(!client||!u||!body)return;const fy=year(),mi=monthIndex();
+    const val=(tr,f)=>n(tr.querySelector(`[data-field="${f}"]`)?.value);
+    const rows=SECTORS.map(sec=>{const tr=body.querySelector(`tr[data-sector="${sec}"]`);return{fiscal_start_year:fy,sector_id:sec,month_index:mi,ca:val(tr,'ca'),nc:val(tr,'nc'),upcross:val(tr,'upcross'),updated_at:new Date().toISOString(),updated_by:u.id}});
+    const msg=document.getElementById('fstMonthMsg');if(msg)msg.textContent='Enregistrement des 4 secteurs…';
+    const r=await client.from('sector_monthly_sales').upsert(rows,{onConflict:'fiscal_start_year,sector_id,month_index'});if(r.error){if(msg)msg.textContent='Erreur : '+r.error.message;return}
+    rows.forEach(row=>{const i=monthly.findIndex(x=>Number(x.sector_id)===row.sector_id&&Number(x.month_index)===mi);if(i>=0)monthly[i]=row;else monthly.push(row)});
+    renderAgency();renderSectorSummary();renderSellerSummary();if(msg)msg.textContent=`${MONTHS[mi-1]} enregistré pour S1, S2, S3 et S4.`;
+  }
+
   async function saveTargets(){
     const client=getSb(),u=getUser(),body=document.getElementById('fstTargetBody');if(!client||!u||!body)return;
     const val=(tr,f)=>n(tr?.querySelector(`[data-field="${f}"]`)?.value),ar=body.querySelector('tr[data-agency]'),fy=year();
@@ -53,7 +82,7 @@
     const msg=document.getElementById('fstTargetMsg');if(msg)msg.textContent='Enregistrement…';
     const a=await client.from('agency_sales_targets').upsert(agencyRow,{onConflict:'fiscal_start_year'});if(a.error){if(msg)msg.textContent='Erreur : '+a.error.message;return}
     const s=await client.from('sector_sales_targets').upsert(sectorRows,{onConflict:'fiscal_start_year,sector_id'});if(s.error){if(msg)msg.textContent='Erreur : '+s.error.message;return}
-    agency=agencyRow;sectorRows.forEach(x=>targets.set(Number(x.sector_id),x));renderSectorSummary();renderSellerSummary();if(msg)msg.textContent='Objectifs agence et secteurs enregistrés.';
+    agency=agencyRow;sectorRows.forEach(x=>targets.set(Number(x.sector_id),x));renderAgency();renderSectorSummary();renderSellerSummary();if(msg)msg.textContent='Objectifs agence et secteurs enregistrés.';
   }
 
   async function load(force=false){
@@ -62,27 +91,29 @@
       const [pr,tr,mr,ar]=await Promise.all([
         client.from('profiles').select('user_id,display_name,sector_id').eq('role','seller').order('sector_id'),
         client.from('sector_sales_targets').select('*').eq('fiscal_start_year',fy).order('sector_id'),
-        client.from('seller_monthly_sales').select('*').eq('fiscal_start_year',fy),
+        client.from('sector_monthly_sales').select('*').eq('fiscal_start_year',fy),
         client.from('agency_sales_targets').select('*').eq('fiscal_start_year',fy).maybeSingle()
       ]);
       if(pr.error)throw pr.error;if(tr.error)throw tr.error;if(mr.error)throw mr.error;if(ar.error)throw ar.error;
       sellers=pr.data||[];monthly=mr.data||[];targets=new Map((tr.data||[]).map(x=>[Number(x.sector_id),x]));SECTORS.forEach(sec=>{if(!targets.has(sec))targets.set(sec,{fiscal_start_year:fy,sector_id:sec,ca_target:0,nc_target:0,upcross_target:0})});agency=ar.data||{fiscal_start_year:fy,ca_target:0,nc_target:0,upcross_target:0};loadedYear=fy;
-      renderSectorSummary();renderSellerSummary();renderTargets();wire();
-    }catch(e){const msg=document.getElementById('fstTargetMsg');if(msg)msg.textContent='Erreur secteurs : '+(e?.message||e)}finally{busy=false}
+      renderAgency();renderSectorSummary();renderSellerSummary();renderTargets();renderMonth();wire();
+    }catch(e){const msg=document.getElementById('fstTargetMsg')||document.getElementById('fstMonthMsg');if(msg)msg.textContent='Erreur secteurs : '+(e?.message||e)}finally{busy=false}
   }
 
   function wire(){
     addStyle();ensureSectorCard();
-    const save=document.getElementById('fstSaveTargets');if(save&&!save.dataset.sectorWired){save.dataset.sectorWired='1';save.onclick=saveTargets}
+    const saveT=document.getElementById('fstSaveTargets');if(saveT){saveT.dataset.sectorWired='1';saveT.onclick=saveTargets}
+    const saveM=document.getElementById('fstSaveMonth');if(saveM){saveM.dataset.sectorMonthWired='1';saveM.onclick=saveMonth}
+    const month=document.getElementById('fstMonth');if(month){month.dataset.sectorMonthWired='1';month.onchange=renderMonth}
     const tb=document.getElementById('fstTargetBody');if(tb&&!tb.dataset.sectorObserved){tb.dataset.sectorObserved='1';new MutationObserver(()=>{if(!tb.querySelector('tr[data-sector]'))renderTargets()}).observe(tb,{childList:true})}
     const sb=document.getElementById('fstSummaryBody');if(sb&&!sb.dataset.sectorObserved){sb.dataset.sectorObserved='1';new MutationObserver(()=>{if(!sb.querySelector('tr[data-sector-aware]'))renderSellerSummary()}).observe(sb,{childList:true})}
+    const mb=document.getElementById('fstMonthBody');if(mb&&!mb.dataset.sectorObserved){mb.dataset.sectorObserved='1';new MutationObserver(()=>{if(!mb.querySelector('tr.fst-sector-month-row'))renderMonth()}).observe(mb,{childList:true})}
   }
 
   function boot(){if(!document.getElementById('rexFiscalSalesPage'))return false;wire();load();return true}
   document.addEventListener('click',e=>{
     if(e.target?.id==='fiscalSalesNav')setTimeout(()=>load(true),350);
     if(e.target?.id==='fstReload')setTimeout(()=>load(true),500);
-    if(e.target?.id==='fstSaveMonth')setTimeout(()=>load(true),900);
   });
   document.addEventListener('change',e=>{if(e.target?.id==='fstYear'){loadedYear=null;setTimeout(()=>load(true),600)}});
   let tries=0;const t=setInterval(()=>{tries++;if(boot()||tries>120)clearInterval(t)},500);window.addEventListener('load',()=>setTimeout(boot,1500));
