@@ -3,96 +3,124 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rex-Rotary Corrèze — Bêta propre</title>
+<title>Rex-Rotary Corrèze</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0e2f68">
 <style>
-html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;background:#edf2f7;color:#14243b}.boot{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.boot-card{background:#fff;border:1px solid #d9e2ec;border-radius:18px;padding:24px;box-shadow:0 20px 60px rgba(20,36,59,.12);max-width:520px;width:100%}.boot-card h1{margin:0 0 8px;color:#0e2f68}.boot-card p{margin:0;color:#667085}.boot-error{color:#b42318;white-space:pre-wrap}.boot-small{font-size:12px;color:#64748b;margin-top:10px}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;font-family:Segoe UI,Arial,sans-serif}
+#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#edf2f7;z-index:20}
+#boot>div{background:white;border:1px solid #d9e2ec;border-radius:18px;padding:24px 30px;box-shadow:0 20px 60px rgba(20,36,59,.12);min-width:360px}
+#boot h1{margin:0 0 7px;color:#0e2f68;font-size:26px}#boot p{margin:0;color:#667085;font-size:14px}
+#appFrame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#edf2f7;display:none}
+#betaBadge{position:fixed;right:12px;top:10px;z-index:999999;background:#10233f;color:#fff;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial;display:none}
 </style>
 </head>
 <body>
-<div class="boot"><div class="boot-card"><h1>Rex-Rotary Corrèze</h1><p id="bootMsg">Chargement de la bêta propre…</p><div id="bootDetail" class="boot-small"></div></div></div>
+<div id="boot"><div><h1>Rex-Rotary Corrèze</h1><p id="bootText">Ouverture de l’application…</p></div></div>
+<iframe id="appFrame" title="Rex-Rotary Corrèze"></iframe>
+<div id="betaBadge">BÊTA SANS SERVICE WORKER</div>
 <script>
 (async()=>{
-  const msg=document.getElementById('bootMsg');
-  const detail=document.getElementById('bootDetail');
+  const boot=document.getElementById('boot');
+  const bootText=document.getElementById('bootText');
+  const frame=document.getElementById('appFrame');
+  const badge=document.getElementById('betaBadge');
+  const root=new URL('../',location.href);
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-  async function cleanWorkers(){
-    if(!('serviceWorker' in navigator))return;
+
+  async function unregisterWorkers(){
+    if(!('serviceWorker' in navigator))return false;
     try{
-      const regs=await navigator.serviceWorker.getRegistrations();
-      let removed=0;
-      for(const reg of regs){
-        if((reg.scope||'').includes('/rex-rotary-Correze/')){
-          const ok=await reg.unregister();if(ok)removed++;
+      const regs=await Promise.race([
+        navigator.serviceWorker.getRegistrations(),
+        new Promise(resolve=>setTimeout(()=>resolve([]),1500))
+      ]);
+      let had=false;
+      for(const reg of regs||[]){
+        if(String(reg.scope||'').includes('/rex-rotary-Correze/')){
+          had=true;
+          try{await reg.unregister()}catch(e){}
         }
       }
-      if(removed){detail.textContent='Nettoyage de l’ancien cache…';await sleep(350)}
-    }catch(e){}
+      return had;
+    }catch(e){return false}
   }
-  async function fetchBase(){
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),8000);
+
+  async function addScript(doc,src){
+    return new Promise(resolve=>{
+      const s=doc.createElement('script');
+      s.src=src;
+      s.async=false;
+      s.onload=()=>resolve(true);
+      s.onerror=()=>resolve(false);
+      doc.body.appendChild(s);
+    });
+  }
+
+  async function injectBeta(){
+    const doc=frame.contentDocument;
+    if(!doc||!doc.body)return;
     try{
-      return await fetch('../index.html?beta_source='+Date.now(),{cache:'no-store',signal:controller.signal,headers:{'Cache-Control':'no-cache'}});
-    }finally{clearTimeout(timer)}
-  }
-  try{
-    await cleanWorkers();
-    detail.textContent='Chargement de l’application…';
-    let r;
-    try{r=await fetchBase()}catch(e){
-      detail.textContent='Nouvelle tentative de chargement…';
-      await sleep(400);
-      r=await fetchBase();
-    }
-    if(!r.ok)throw new Error('Impossible de charger la base V16 (HTTP '+r.status+').');
-    let html=await r.text();
+      const marker=doc.createElement('div');
+      marker.style.cssText='position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial';
+      marker.textContent='BÊTA SANS SERVICE WORKER';
+      doc.body.appendChild(marker);
+    }catch(e){}
 
-    html=html.replace(/<link\s+rel=["']manifest["'][^>]*>/i,'');
-    html=html.replace(/href=["']icon\.svg["']/i,'href="../icon.svg"');
-    html=html.replace(/if\('serviceWorker'in navigator\)window\.addEventListener\('load',\(\)=>navigator\.serviceWorker\.register\('\.\/service-worker\.js'\)\.catch\(\(\)=>\{\}\)\);?/g,'');
-    html=html.replace('</head>','<link rel="manifest" href="./manifest.webmanifest"><meta name="application-name" content="Rex-Rotary Corrèze"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Rex Corrèze"></head>');
-
+    const local=p=>new URL(p,root).href;
     const modules=[
-      '../admin-seller.js?v=9',
-      '../weekly-forecast.js?v=3',
-      './monthly-forecast.js?v=1',
-      '../ui-v3.js?v=2',
-      './seller-action-dashboard.js?v=1',
-      './admin-weekly-tasks.js?v=1',
-      './forecast-tabs.js?v=1',
-      './forecast-form-wide.js?v=1',
-      '../map-companies.js?v=2',
-      './map-assign.js?v=1',
-      './active-clients.js?v=1',
-      './map-active-clients.js?v=1',
-      './map-active-labels.js?v=1',
-      './prospection-physique.js?v=1',
-      '../tickets.js?v=1',
-      './phoning.js?v=4',
+      local('admin-seller.js?v=9'),
+      local('weekly-forecast.js?v=3'),
+      local('beta/monthly-forecast.js?v=1'),
+      local('ui-v3.js?v=2'),
+      local('beta/seller-action-dashboard.js?v=1'),
+      local('beta/admin-weekly-tasks.js?v=1'),
+      local('beta/forecast-tabs.js?v=1'),
+      local('beta/forecast-form-wide.js?v=1'),
+      local('map-companies.js?v=2'),
+      local('beta/map-assign.js?v=1'),
+      local('beta/active-clients.js?v=1'),
+      local('beta/map-active-clients.js?v=1'),
+      local('beta/map-active-labels.js?v=1'),
+      local('beta/prospection-physique.js?v=1'),
+      local('tickets.js?v=1'),
+      local('beta/phoning.js?v=4'),
       'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@69b4e270773124dd283d92f32368a857d5f613e4/friday-point.js',
-      './friday-weekly-entry.js?v=1',
-      './friday-wide-nextweek.js?v=1',
-      './friday-signed-deals.js?v=1',
+      local('beta/friday-weekly-entry.js?v=1'),
+      local('beta/friday-wide-nextweek.js?v=1'),
+      local('beta/friday-signed-deals.js?v=1'),
       'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@0eeb53b8fc07332bd8a0397e53a5f2435703c7e8/friday-actions.js',
-      './friday-action-manager.js?v=1',
-      './friday-checklist.js?v=3',
+      local('beta/friday-action-manager.js?v=1'),
+      local('beta/friday-checklist.js?v=3'),
       'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@47ed7bccd85be765f1b29734863dbf37d5901a90/company-update.js',
-      './nav-order.js?v=1',
-      './friday-nav-guard.js?v=1'
+      local('beta/nav-order.js?v=1'),
+      local('beta/friday-nav-guard.js?v=1')
     ];
-    const closeScript='</scr'+'ipt>';
-    const tags=modules.map(src=>'<script src="'+src+'">'+closeScript).join('');
-    html=html.replace('</body>',tags+'</body>');
-    html=html.replace('</body>','<div style="position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial">BÊTA SANS SERVICE WORKER</div></body>');
-
-    document.open();
-    document.write(html);
-    document.close();
-  }catch(e){
-    msg.className='boot-error';
-    msg.textContent='Erreur de chargement : '+(e?.name==='AbortError'?'délai dépassé':(e?.message||e));
-    detail.textContent='Recharge la page une fois. Si le problème persiste, envoie-moi cet écran.';
+    for(const src of modules)await addScript(doc,src);
+    await unregisterWorkers();
   }
+
+  await unregisterWorkers();
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller && !sessionStorage.getItem('rexBetaDetached')){
+    sessionStorage.setItem('rexBetaDetached','1');
+    bootText.textContent='Nettoyage de l’ancien cache…';
+    await sleep(250);
+    location.replace(location.pathname+'?clean='+Date.now());
+    return;
+  }
+  sessionStorage.removeItem('rexBetaDetached');
+
+  frame.onload=async()=>{
+    frame.style.display='block';
+    boot.style.display='none';
+    badge.style.display='none';
+    await injectBeta();
+  };
+  frame.onerror=()=>{bootText.textContent='Impossible d’ouvrir l’application. Recharge la page.'};
+  frame.src=new URL('index.html?beta_frame='+Date.now(),root).href;
+  setTimeout(()=>{
+    if(frame.style.display!=='block')bootText.textContent='Chargement plus long que prévu… recharge la page si nécessaire.';
+  },10000);
 })();
 </script>
 </body>
