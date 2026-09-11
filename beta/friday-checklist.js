@@ -1,10 +1,9 @@
 (()=>{
-  let sellers=[],rows=[],prevRows=[],week='',busy=false,lastSig='';
+  let sellers=[],rows=[],week='',busy=false,lastSig='';
   function getSb(){try{return sb}catch(e){return null}}
   function getProfile(){try{return profile||currentProfile||null}catch(e){return null}}
   function getUser(){try{return user||currentUser||null}catch(e){return null}}
   function isAdmin(){return getProfile()?.role==='admin'}
-  function previousWeek(w){if(!w)return'';const d=new Date(w+'T12:00:00');d.setDate(d.getDate()-7);return d.toISOString().slice(0,10)}
   function addStyle(){
     if(document.getElementById('fridayChecklistStyle'))return;
     const s=document.createElement('style');s.id='fridayChecklistStyle';s.textContent=`
@@ -12,15 +11,11 @@
     `;document.head.appendChild(s);
   }
   function currentFor(uid){return rows.find(r=>r.user_id===uid)||{}}
-  function previousFor(uid){return prevRows.find(r=>r.user_id===uid)||{}}
   function blockHtml(s){
-    const cur=currentFor(s.user_id),prev=previousFor(s.user_id),hasAction=!!(prev.agreed_actions||'').trim();
-    const editable=isAdmin()||getUser()?.id===s.user_id;
-    const status=cur.previous_action_status||'';
-    const actionDone=status==='done';
+    const cur=currentFor(s.user_id),editable=isAdmin()||getUser()?.id===s.user_id;
     const agenda=!!cur.agenda_up_to_date,portfolio=!!cur.portfolio_up_to_date,km=!!cur.km_up_to_date;
     const item=(key,label,checked,disabled=false)=>`<label class="fpc-check ${checked?'done':''} ${disabled?'readonly':''}" data-key="${key}"><input type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''}> <span>${label}</span></label>`;
-    return `<div class="fpc-box" data-fpc="${s.user_id}"><div class="fpc-title">✓ Contrôles du vendredi</div><div class="fpc-list">${hasAction?item('previous_action_status','Action précédente faite',actionDone,!editable):''}${item('agenda_up_to_date','Agenda à jour',agenda,!editable)}${item('portfolio_up_to_date','Portefeuille à jour',portfolio,!editable)}${item('km_up_to_date','KM',km,!editable)}</div><div class="fpc-msg"></div></div>`;
+    return `<div class="fpc-box" data-fpc="${s.user_id}"><div class="fpc-title">✓ Contrôles du vendredi</div><div class="fpc-list">${item('agenda_up_to_date','Agenda à jour',agenda,!editable)}${item('portfolio_up_to_date','Portefeuille à jour',portfolio,!editable)}${item('km_up_to_date','KM',km,!editable)}</div><div class="fpc-msg"></div></div>`;
   }
   async function loadData(){
     const client=getSb(),p=getProfile(),u=getUser(),w=document.getElementById('fpWeek')?.value||'';if(!client||!p||!u||!w)return;
@@ -28,13 +23,9 @@
     if(p.role==='admin'){
       const q=await client.from('profiles').select('user_id,display_name,sector_id').eq('role','seller').order('sector_id');sellers=q.data||[];
     }else sellers=[{user_id:u.id,display_name:p.display_name||u.email,sector_id:p.sector_id}];
-    const ids=sellers.map(s=>s.user_id);if(!ids.length){rows=[];prevRows=[];render();return}
-    const prev=previousWeek(w);
-    const [a,b]=await Promise.all([
-      client.from('friday_activity').select('user_id,week_start,previous_action_status,agenda_up_to_date,portfolio_up_to_date,km_up_to_date').eq('week_start',w).in('user_id',ids),
-      client.from('friday_activity').select('user_id,week_start,agreed_actions').eq('week_start',prev).in('user_id',ids)
-    ]);
-    rows=a.data||[];prevRows=b.data||[];render();
+    const ids=sellers.map(s=>s.user_id);if(!ids.length){rows=[];render();return}
+    const a=await client.from('friday_activity').select('user_id,week_start,agenda_up_to_date,portfolio_up_to_date,km_up_to_date').eq('week_start',w).in('user_id',ids);
+    rows=a.data||[];render();
   }
   function render(){
     addStyle();const cards=[...document.querySelectorAll('#fpCards .fp-seller')];if(!cards.length)return;
@@ -49,11 +40,7 @@
   async function save(input){
     const box=input.closest('[data-fpc]'),label=input.closest('.fpc-check'),uid=box?.dataset.fpc,key=label?.dataset.key,client=getSb();if(!box||!uid||!key||!client)return;
     const msg=box.querySelector('.fpc-msg');msg.textContent='Enregistrement…';
-    const row={user_id:uid,week_start:week,updated_at:new Date().toISOString()};
-    if(key==='previous_action_status'){
-      row.previous_action_status=input.checked?'done':null;
-      row.previous_action_reviewed_at=new Date().toISOString();
-    }else row[key]=!!input.checked;
+    const row={user_id:uid,week_start:week,updated_at:new Date().toISOString()};row[key]=!!input.checked;
     const r=await client.from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});
     if(r.error){input.checked=!input.checked;msg.textContent='Erreur : '+r.error.message;return}
     let cur=rows.find(x=>x.user_id===uid);if(!cur){cur={user_id:uid,week_start:week};rows.push(cur)}Object.assign(cur,row);
