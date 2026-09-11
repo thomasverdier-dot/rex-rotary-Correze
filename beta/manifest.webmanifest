@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Rex-Rotary Corrèze",
+  "short_name": "Rex Corrèze",
+  "description": "Application commerciale Rex-Rotary Corrèze",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf2f7",
+  "theme_color": "#0e2f68",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "../icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
