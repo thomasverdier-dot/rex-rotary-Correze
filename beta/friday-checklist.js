@@ -18,9 +18,9 @@
     const editable=isAdmin()||getUser()?.id===s.user_id;
     const status=cur.previous_action_status||'';
     const actionDone=status==='done';
-    const agenda=!!cur.agenda_up_to_date,portfolio=!!cur.portfolio_up_to_date;
+    const agenda=!!cur.agenda_up_to_date,portfolio=!!cur.portfolio_up_to_date,km=!!cur.km_up_to_date;
     const item=(key,label,checked,disabled=false)=>`<label class="fpc-check ${checked?'done':''} ${disabled?'readonly':''}" data-key="${key}"><input type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''}> <span>${label}</span></label>`;
-    return `<div class="fpc-box" data-fpc="${s.user_id}"><div class="fpc-title">✓ Contrôles du vendredi</div><div class="fpc-list">${hasAction?item('previous_action_status','Action précédente faite',actionDone,!editable):''}${item('agenda_up_to_date','Agenda à jour',agenda,!editable)}${item('portfolio_up_to_date','Portefeuille à jour',portfolio,!editable)}</div><div class="fpc-msg"></div></div>`;
+    return `<div class="fpc-box" data-fpc="${s.user_id}"><div class="fpc-title">✓ Contrôles du vendredi</div><div class="fpc-list">${hasAction?item('previous_action_status','Action précédente faite',actionDone,!editable):''}${item('agenda_up_to_date','Agenda à jour',agenda,!editable)}${item('portfolio_up_to_date','Portefeuille à jour',portfolio,!editable)}${item('km_up_to_date','KM',km,!editable)}</div><div class="fpc-msg"></div></div>`;
   }
   async function loadData(){
     const client=getSb(),p=getProfile(),u=getUser(),w=document.getElementById('fpWeek')?.value||'';if(!client||!p||!u||!w)return;
@@ -31,7 +31,7 @@
     const ids=sellers.map(s=>s.user_id);if(!ids.length){rows=[];prevRows=[];render();return}
     const prev=previousWeek(w);
     const [a,b]=await Promise.all([
-      client.from('friday_activity').select('user_id,week_start,previous_action_status,agenda_up_to_date,portfolio_up_to_date').eq('week_start',w).in('user_id',ids),
+      client.from('friday_activity').select('user_id,week_start,previous_action_status,agenda_up_to_date,portfolio_up_to_date,km_up_to_date').eq('week_start',w).in('user_id',ids),
       client.from('friday_activity').select('user_id,week_start,agreed_actions').eq('week_start',prev).in('user_id',ids)
     ]);
     rows=a.data||[];prevRows=b.data||[];render();
