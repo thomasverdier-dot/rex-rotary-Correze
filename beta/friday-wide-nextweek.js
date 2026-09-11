@@ -1,6 +1,6 @@
 (()=>{
-  let busy=false,lastSig='',lastLoad=0,sellers=[],rows=[];
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let busy=false,lastSig='',sellers=[],rows=[];
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const euro=n=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(Number(n||0))+' k€';
   function getSb(){try{return sb}catch(e){return null}}
   function getProfile(){try{return profile||currentProfile||null}catch(e){return null}}
@@ -52,9 +52,8 @@
   async function tick(){
     const page=document.getElementById('rexFridayPage');if(!page)return;
     const week=document.getElementById('fpWeek')?.value||'',cards=document.querySelectorAll('#fpCards .fp-seller').length,role=getProfile()?.role||'',sig=week+'|'+cards+'|'+role;
-    const due=Date.now()-lastLoad>12000;
-    if(!busy&&(sig!==lastSig||!document.querySelector('.fp-nextweek')||due)){
-      busy=true;try{await load();lastSig=sig;lastLoad=Date.now()}finally{busy=false}
+    if(!busy&&(sig!==lastSig||!document.querySelector('.fp-nextweek'))){
+      busy=true;try{await load();lastSig=sig}finally{busy=false}
     }
   }
   setInterval(tick,1000);window.addEventListener('load',()=>setTimeout(tick,1800));
