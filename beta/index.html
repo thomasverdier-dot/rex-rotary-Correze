@@ -24,7 +24,6 @@ html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;backgro
     html=html.replace(/if\('serviceWorker'in navigator\)window\.addEventListener\('load',\(\)=>navigator\.serviceWorker\.register\('\.\/service-worker\.js'\)\.catch\(\(\)=>\{\}\)\);?/g,'');
 
     // Modules V16 chargés explicitement et dans un ordre fixe.
-    // On construit la fermeture </script> en deux morceaux pour ne pas fermer ce script chargeur par erreur.
     const modules=[
       '../admin-seller.js?v=9',
       '../weekly-forecast.js?v=3',
@@ -38,7 +37,6 @@ html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;backgro
     const tags=modules.map(src=>'<script src="'+src+'">'+closeScript).join('');
     html=html.replace('</body>',tags+'</body>');
 
-    // Marqueur visuel discret pour ne jamais confondre la bêta avec la V16 stable.
     html=html.replace('</body>','<div style="position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial">BÊTA SANS SERVICE WORKER</div></body>');
 
     document.open();
