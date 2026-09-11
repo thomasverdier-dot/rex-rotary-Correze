@@ -8,7 +8,6 @@
     `;document.head.appendChild(s)
   }
   function txt(el){return (el?.textContent||'').replace(/\s+/g,' ').trim()}
-  function href(row,selector){return row.querySelector(selector)?.href||''}
   function validRows(body){return [...(body?.querySelectorAll('tr')||[])].filter(r=>!r.querySelector('.pp-empty,.ph-empty')&&r.querySelectorAll('td').length>1)}
   function safeFilePart(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'listing'}
   function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`}
@@ -25,16 +24,13 @@
         'Adresse à visiter':txt(c[3]),
         'Effectif':txt(c[4]),
         'APE':txt(c[5]),
-        'Itinéraire':href(r,'a.route'),
-        'Fiche officielle':href(r,'a[href*="annuaire-entreprises.data.gouv.fr"]'),
-        'Recherche téléphone':href(r,'a[href*="google.com/search"]')
+        'Téléphone':''
       }
     })
   }
   function phoningRows(){
     const body=document.getElementById('phBody');return validRows(body).map((r,i)=>{
-      const c=r.querySelectorAll('td'),official=href(r,'a[href*="annuaire-entreprises.data.gouv.fr"]');
-      const siren=(official.match(/(\d{9})(?:\D*$)/)||[])[1]||'';
+      const c=r.querySelectorAll('td');
       return {
         'N°':i+1,
         'Entreprise':txt(c[1]?.querySelector('b'))||txt(c[1]),
@@ -42,10 +38,7 @@
         'Code postal':txt(c[2]),
         'Effectif':txt(c[3]),
         'APE':txt(c[4]),
-        'Dirigeant':txt(c[5]),
-        'SIREN':siren,
-        'Recherche téléphone':href(r,'a.call'),
-        'Fiche officielle':official
+        'Téléphone':''
       }
     })
   }
@@ -64,7 +57,7 @@
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!merges']=[XLSX.utils.decode_range(`A1:${XLSX.utils.encode_col(headers.length-1)}1`),XLSX.utils.decode_range(`A2:${XLSX.utils.encode_col(headers.length-1)}2`),XLSX.utils.decode_range(`A3:${XLSX.utils.encode_col(headers.length-1)}3`)];
     ws['!autofilter']={ref:`A5:${XLSX.utils.encode_col(headers.length-1)}${rows.length+5}`};
-    ws['!cols']=headers.map(h=>({wch:Math.min(42,Math.max(10,h.length+2,...rows.map(r=>String(r[h]??'').length+2)))}));
+    ws['!cols']=headers.map(h=>h==='Téléphone'?{wch:20}:({wch:Math.min(42,Math.max(10,h.length+2,...rows.map(r=>String(r[h]??'').length+2)))}));
     ws['!freeze']={xSplit:0,ySplit:5,topLeftCell:'A6',activePane:'bottomLeft',state:'frozen'};
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,physical?'Prospection physique':'Phoning');
     wb.Props={Title:title,Subject:'Listing commercial Rex-Rotary Corrèze',Author:'Rex-Rotary Corrèze',CreatedDate:new Date()};
