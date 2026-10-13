@@ -109,9 +109,10 @@
  }
  function tick(){
   const date=nextDate();if(!date)return;style();
-  const list=boxes();for(const item of list)attach(item);
+  const list=boxes();let newCard=false;
+  for(const item of list){if(!item.card.querySelector('.fp-nextweek-editor'))newCard=true;attach(item)}
   const sig=date+'|'+list.map(x=>x.uid).join(',');
-  if(sig!==lastKey||Date.now()-refreshAt>60000)load();
+  if(newCard||sig!==lastKey||Date.now()-refreshAt>60000)load();
  }
  setInterval(tick,1200);window.addEventListener('load',()=>setTimeout(tick,1700));
 })();
