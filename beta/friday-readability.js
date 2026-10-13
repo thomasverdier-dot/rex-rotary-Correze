@@ -37,6 +37,8 @@
    #rexFridayPage .fp-workflow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
    #rexFridayPage .fp-workflow span{font-size:10px;padding:5px 8px;background:#f1f5f9;border-radius:999px;color:#64748b}
    #rexFridayPage .fp-workflow span.done{background:#dcfce7;color:#166534}
+   #rexFridayPage .fp-manager{margin-bottom:14px;padding:14px;border:1px solid #dbe5f1;border-radius:12px;background:#fff}
+   #rexFridayPage .fp-manager .fp-copy{display:none!important}
    #rexFridayPage .fpr-box .fpr-text{max-height:300px;overflow:auto;font-size:12px;line-height:1.65}
    #rexFridayPage .fpr-box .fpr-actions{display:flex;flex-wrap:wrap;gap:8px}
    @media(max-width:700px){#rexFridayPage .fp-tabs button{min-width:calc(50% - 5px)}#rexFridayPage .fp-tools label{flex:1}#rexFridayPage .fp-tools select{min-width:0;width:100%}}
@@ -60,8 +62,8 @@
    if(node.matches('.fps-box'))return 'sales';
    if(node.matches('.fp-nextweek,.fp-forecast,.fp-nextweek-editor'))return 'forecast';
    if(node.matches('.fp-week-comment'))return 'comment';
-   if(node.matches('.fpa-box,.fpc-box,.fp-manager'))return 'actions';
-   if(node.matches('.fpr-box,.fp-summary-box'))return 'report';
+   if(node.matches('.fpa-box,.fpc-box'))return 'actions';
+   if(node.matches('.fp-manager,.fpr-box,.fp-summary-box'))return 'report';
    return null;
  }
  function stage(card){
@@ -92,6 +94,15 @@
     }
     body.prepend(tabs);
    }
+   const manager=body.querySelector(':scope > .fp-manager');
+   const report=body.querySelector(':scope > .fpr-box');
+   if(manager){
+     const heading=manager.querySelector(':scope > b');
+     if(heading&&heading.textContent!=='Synthèse de l’entretien et actions convenues')heading.textContent='Synthèse de l’entretien et actions convenues';
+     const save=manager.querySelector('.fp-summary-btn');
+     if(save&&save.textContent!=='Enregistrer la synthèse et les actions')save.textContent='Enregistrer la synthèse et les actions';
+   }
+   if(manager&&report&&manager.nextElementSibling!==report)body.insertBefore(manager,report);
    for(const child of [...body.children]){
      if(child===tabs||child.classList.contains('fp-workflow'))continue;
      let cat=category(child);
