@@ -18,7 +18,7 @@
  const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
  const now=new Date();
  let year=now.getFullYear(),month=now.getMonth()+1,people=[],selectedSeller='',metric='ca',
-     rows=[],sales=[],loaded=false,busy=false,pending=false,saving=false,lastFetch=0,timer=null,
+     rows=[],sectorRows=[],sales=[],loaded=false,busy=false,pending=false,saving=false,lastFetch=0,timer=null,
      message='',messageType='',editorOpen=false,historyOpen=true,active=false,lastOutput='';
  function rowKey(uid,y,m){return `${uid}|${iso(y,m)}`}
  function historyMap(records){
@@ -30,6 +30,23 @@
      map.set(rowKey(r.user_id,cy,cm),r);
    }
    return map;
+ }
+ // Les archives fiscales existantes sont liées aux secteurs et non à une
+ // identité commerciale. On les affiche séparément sans réaffectation implicite.
+ function sectorArchiveByMonth(records,calendarYear){
+   const result=[];
+   for(let monthNum=1;monthNum<=12;monthNum++){
+     const matching=records.filter(r=>{
+       const fy=Number(r.fiscal_start_year),mi=Number(r.month_index);
+       if(mi<1||mi>12)return false;
+       const y=mi<=9?fy:fy+1,m=mi<=9?mi+3:mi-9;
+       return y===calendarYear&&m===monthNum;
+     });
+     const sectors=[1,2,3,4].map(sec=>matching.find(x=>Number(x.sector_id)===sec)||null);
+     const aggregate=field=>sectors.every(Boolean)?sectors.reduce((sum,row)=>sum+kilo(row[field]),0):null;
+     return {month:monthNum,sectors,ca:aggregate('ca'),nc:aggregate('nc'),upcross:aggregate('upcross')};
+   }
+   return result;
  }
  function signedMap(deals){
    const map=new Map();
@@ -130,8 +147,12 @@
         <td>${fmt(d.nc)}</td><td>${fmt(d.uc)}</td></tr>`).join('');
    const summary=`<tr class="rxh-total"><th>Agence Corrèze</th><td>${fmt(totCur)}</td><td>${fmt(totPrev)}</td><td>${fmt(totLast)}</td><td>${delta(totCur,totPrev)}</td><td>${delta(totCur,totLast)}</td>
         <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year,month,'upcross',result.actual))}</td></tr>`;
+   const sectorHistory=sectorArchiveByMonth(sectorRows,historyYear);
+   const fiscalRows=sectorHistory.map(r=>`<tr><th scope="row">${safe(MONTHS[r.month-1])}</th>
+     ${r.sectors.map(row=>`<td>${row?fmt(kilo(row.ca)):'Non renseigné'}</td>`).join('')}
+     <td><strong>${fmt(r.ca)}</strong></td><td>${fmt(r.nc)}</td><td>${fmt(r.upcross)}</td></tr>`).join('');
    const nonEntered=people.filter(p=>!hist.get(rowKey(p.user_id,historyYear,month))).length;
-   const output=JSON.stringify([year,month,people,data,rows,sales,metric,selectedSeller,editorOpen,historyOpen,message,messageType]);
+   const output=JSON.stringify([year,month,people,data,rows,sectorRows,sales,metric,selectedSeller,editorOpen,historyOpen,message,messageType]);
    if(lastOutput===output&&box.querySelector('#rxhMonth'))return;
    const layout=`<div class="rxh-heading">
       <div><div class="rxh-eyebrow">CRM REX-ROTARY CORRÈZE · VUE RESPONSABLE</div><h3>Analyse comparative des résultats</h3>
@@ -157,6 +178,13 @@
            </div><small>${safe(x.name)}</small></div>`).join('')}
      </div>
      <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Les anciens chiffres saisis par secteur ne sont pas associés automatiquement à un commercial. Le total N-1 agence reste indisponible si un vendeur manque. Le NC et l'UC sont inclus dans le CA.</p></div>
+     <div class="rxh-panel"><div class="rxh-panel-head"><div><h4>Archives CA fiscal ${historyYear} · par secteur</h4>
+       <p>Chiffres de l'exercice fiscal saisis dans Suivi CA fiscal, regroupés par mois civil. Objectifs personnels inchangés.</p></div></div>
+       <div class="rxh-scroll"><table class="rxh-table"><thead><tr>
+         <th>Mois</th><th>CA S1</th><th>CA S2</th><th>CA S3</th><th>CA S4</th><th>CA agence enregistré</th><th>NC agence</th><th>UC agence</th>
+       </tr></thead><tbody>${fiscalRows}</tbody></table></div>
+       <p class="rxh-note">Ces valeurs appartiennent aux secteurs 1 à 4 et ne sont pas attribuées aux commerciaux actuels. Les lignes nulles peuvent provenir de secteurs non renseignés ; vérifie-les avant d'utiliser le total agence pour un bilan officiel. Les objectifs CA / NC / UC restent individuels.</p>
+     </div>
      <details class="rxh-editor" id="rxhEditor" ${editorOpen?'open':''}>
        <summary>✎ Saisir ou corriger le CA, NC et UC de ${historyYear}, mois par mois et par vendeur</summary>
        <p>Uniquement visible et modifiable par le responsable. Montants à saisir en <b>euros</b> : ils sont enregistrés dans le suivi CA fiscal existant (qui utilise les k€).</p>
@@ -238,18 +266,20 @@
    busy=true;lastFetch=Date.now();
    const currentYear=year,prevYear=year-1;
    try{
-     const [pr,sa,hi]=await Promise.all([
+     const [pr,sa,hi,sh]=await Promise.all([
        client.from('profiles').select('user_id,display_name,role,sector_id').eq('role','seller').order('sector_id'),
        client.from('monthly_forecasts').select('user_id,signature_date,signed_amount_eur,client_type,sale_type')
          .eq('sale_completed',true).gte('signature_date',`${currentYear}-01-01`).lt('signature_date',`${currentYear+1}-01-01`),
        client.from('seller_monthly_sales').select('fiscal_start_year,month_index,user_id,ca,nc,upcross,sector_id')
+         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',prevYear),
+       client.from('sector_monthly_sales').select('fiscal_start_year,month_index,sector_id,ca,nc,upcross')
          .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',prevYear)
      ]);
-     for(const v of [pr,sa,hi])if(v.error)throw v.error;
+     for(const v of [pr,sa,hi,sh])if(v.error)throw v.error;
      if(year!==currentYear){pending=true;return}
      people=pr.data||[];
      sales=sa.data||[];
-     rows=hi.data||[];
+     rows=hi.data||[];sectorRows=sh.data||[];
      if(!people.some(p=>p.user_id===selectedSeller))selectedSeller=people[0]?.user_id||'';
      loaded=true;lastOutput='';if(!message)messageType='ok';draw();
    }catch(e){box.innerHTML=`<div class="rxh-error">Impossible de charger les comparaisons : ${safe(e?.message||e)}</div><button type="button" id="rxhRetry">Réessayer</button>`;box.querySelector('#rxhRetry').onclick=load}
@@ -270,6 +300,7 @@
  }
  window.addEventListener('rex:commercial-data-changed',refresh);
  window.addEventListener('rex:monthly-sale-synced',refresh);
+ window.addEventListener('rex:fiscal-monthly-synced',refresh);
  document.addEventListener('click',e=>{if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(refresh,160)});
  window.addEventListener('focus',()=>{if(lastFetch&&Date.now()-lastFetch>60000)refresh()});
  const t=setInterval(()=>{if(start())clearInterval(t)},500);
