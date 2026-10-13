@@ -121,3 +121,12 @@ BEGIN
  RETURN NEW;
 END
 $sync$;
+
+-- Une modification des centimes est un evenement de synchronisation,
+-- meme lorsque la colonne k€ n'apparait pas dans le UPDATE du client.
+DROP TRIGGER IF EXISTS trg_completed_monthly_sale_to_friday ON public.monthly_forecasts;
+CREATE TRIGGER trg_completed_monthly_sale_to_friday
+AFTER INSERT OR UPDATE OF sale_completed, signature_date, company_name,
+  amount, signed_amount_eur, client_type, sale_type
+ON public.monthly_forecasts
+FOR EACH ROW EXECUTE FUNCTION public.sync_completed_monthly_sale_to_friday();
