@@ -9,7 +9,7 @@
  const nextDate=()=>{const w=document.getElementById('fpWeek')?.value;if(!w)return'';const d=new Date(w+'T12:00:00');d.setDate(d.getDate()+7);return d.toISOString().slice(0,10)};
  const uid=card=>card.querySelector('.fp-manager[id^="fpm_"]')?.id.slice(4)||card.querySelector('.fp-form .fp-main-save')?.dataset.uid||card.querySelector('[data-fpc]')?.dataset.fpc||card.querySelector('[data-fpa]')?.dataset.fpa||'';
  const euro=v=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(Number(v||0))+' k€';
- let items=new Map(),editing=new Map();
+ let items=new Map(),editing=new Map(),monthStatuses=new Map(),monthStatusError='';
  function style(){if(document.getElementById('fridayForecastEditorStyle'))return;const s=document.createElement('style');s.id='fridayForecastEditorStyle';s.textContent=`
   #rexFridayPage .fp-nextweek{display:none!important}
   #rexFridayPage .fp-nextweek-editor{margin-top:10px;padding:15px;background:#f8fafc;border:1px solid #dbe5f1;border-radius:13px}
@@ -27,6 +27,8 @@
   #rexFridayPage .fp-edit-table{width:100%;border-collapse:collapse;font-size:12px;min-width:710px}
   #rexFridayPage .fp-edit-table td,#rexFridayPage .fp-edit-table th{padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:left}
   #rexFridayPage .fp-edit-table button{padding:6px 9px;background:white;border:1px solid #cbd5e1;border-radius:7px;margin-right:5px}
+  #rexFridayPage .fp-edit-month{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;font-weight:800;color:#334155;margin-right:8px}
+  #rexFridayPage .fp-edit-month input{width:16px;height:16px;accent-color:#0f6b47}
   #rexFridayPage .fp-edit-totals{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:12px;font-weight:800}
   @media(max-width:1000px){#rexFridayPage .fp-edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:560px){#rexFridayPage .fp-edit-grid{grid-template-columns:1fr}}
@@ -59,7 +61,11 @@
     const btn=e.target.closest('button[data-action][data-id]');if(!btn)return;
     if(btn.dataset.action==='edit')startEdit(id,el,btn.dataset.id);
     if(btn.dataset.action==='delete')remove(id,el,btn.dataset.id);
-    if(btn.dataset.action==='month')promote(id,el,btn.dataset.id,btn);
+
+   });
+   el.querySelector('.fp-edit-wrap').addEventListener('change',event=>{
+     const checkbox=event.target.closest('input[data-action="month"][data-id]');
+     if(checkbox)toggleMonth(id,el,checkbox.dataset.id,checkbox);
    });
   }
   return el;
@@ -68,17 +74,23 @@
   const list=items.get(id)||[],cl=list.filter(x=>x.client_type==='acquis').reduce((sum,x)=>sum+Number(x.amount||0),0),nc=list.filter(x=>x.client_type==='nouveau').reduce((sum,x)=>sum+Number(x.amount||0),0);
   el.querySelector('.fp-edit-week').textContent='Semaine du '+new Date(date+'T12:00:00').toLocaleDateString('fr-FR');
   el.querySelector('.fp-edit-totals').innerHTML=`<span>CL : ${euro(cl)}</span><span>NC : ${euro(nc)}</span><span>Total : ${euro(cl+nc)}</span>`;
-  el.querySelector('.fp-edit-wrap').innerHTML=list.length?`<table class="fp-edit-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Prob.</th><th>RDV</th><th>Actions</th></tr></thead><tbody>${list.map(x=>`<tr data-id="${esc(x.id)}"><td>${esc(x.company_name)}</td><td>${euro(x.amount)}</td><td>${x.client_type==='nouveau'?'NC':'CL'}</td><td>${x.client_type==='nouveau'?'—':x.sale_type==='up_sell'||x.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(x.probability)||0}%</td><td>${x.negotiation_meeting_scheduled?'Oui':'—'}</td><td>${canEdit(id)?`<button type="button" data-action="month" data-id="${esc(x.id)}">Ajouter au mois</button><button type="button" data-action="edit" data-id="${esc(x.id)}">Modifier</button><button type="button" data-action="delete" data-id="${esc(x.id)}">Supprimer</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:14px;color:#64748b">Aucune affaire prévue pour S+1.</div>';
+  el.querySelector('.fp-edit-wrap').innerHTML=list.length?`<table class="fp-edit-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Prob.</th><th>RDV</th><th>Actions</th></tr></thead><tbody>${list.map(x=>`<tr data-id="${esc(x.id)}"><td>${esc(x.company_name)}</td><td>${euro(x.amount)}</td><td>${x.client_type==='nouveau'?'NC':'CL'}</td><td>${x.client_type==='nouveau'?'—':x.sale_type==='up_sell'||x.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(x.probability)||0}%</td><td>${x.negotiation_meeting_scheduled?'Oui':'—'}</td><td>${canEdit(id)?`<label class="fp-edit-month" title="${esc(monthStatuses.get(x.id)?.message||monthStatusError)}"><input type="checkbox" data-action="month" data-id="${esc(x.id)}" ${monthStatuses.get(x.id)?.checked?'checked':''} ${monthStatuses.get(x.id)?.locked||monthStatusError?'disabled':''}> Au mois</label><button type="button" data-action="edit" data-id="${esc(x.id)}">Modifier</button><button type="button" data-action="delete" data-id="${esc(x.id)}">Supprimer</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:14px;color:#64748b">Aucune affaire prévue pour S+1.</div>';
  }
- async function promote(id,el,recordId,btn){
-  const row=(items.get(id)||[]).find(x=>x.id===recordId),message=el.querySelector('.fp-edit-status');
-  if(!row||!window.rexPromoteToMonth)return;
-  btn.disabled=true;
-  try{
-    const result=await window.rexPromoteToMonth(row,nextDate(),'forecast');
-    message.textContent=result.message;message.classList.toggle('error',!result.ok&&!result.already);
-    if(result.ok||result.already){btn.textContent='Déjà au mois';btn.disabled=true}
-  }finally{if(btn.textContent!=='Déjà au mois')btn.disabled=false}
+ async function toggleMonth(id,el,recordId,checkbox){
+  const row=(items.get(id)||[]).find(x=>x.id===recordId);
+  const previous=monthStatuses.get(recordId)?.checked||false;
+  if(!row||!canEdit(id)||!window.rexSetMonthlyMembership){checkbox.checked=previous;return}
+  checkbox.disabled=true;
+  let result;
+  try{result=await window.rexSetMonthlyMembership(row,nextDate(),'weekly',checkbox.checked)}
+  catch(e){result={ok:false,message:String(e?.message||e)}}
+  const msg=el.querySelector('.fp-edit-status');
+  if(msg){msg.textContent=result.message||'';msg.classList.toggle('error',!result.ok&&!result.cancelled)}
+  if(result.ok){
+    monthStatuses.set(recordId,{checked:!!result.checked,locked:!!result.locked,message:result.locked?result.message:''});
+  }
+  checkbox.checked=result.ok?!!result.checked:previous;
+  checkbox.disabled=!!monthStatuses.get(recordId)?.locked||!!monthStatusError;
  }
  function startEdit(id,el,recordId){
   const row=(items.get(id)||[]).find(x=>x.id===recordId),form=el.querySelector('form');if(!row||!form)return;
@@ -112,6 +124,12 @@
    const q=await client.from(TABLE).select('*').eq('week_start',date).in('user_id',ids).order('created_at');
    if(q.error)throw q.error;
    items=new Map(ids.map(id=>[id,[]]));for(const row of q.data||[]){if(items.has(row.user_id))items.get(row.user_id).push(row)}
+   monthStatuses=new Map();monthStatusError='';
+   try{
+     if(!window.rexMonthlyMembership)throw Error('Module de prévisions mensuelles non disponible');
+     monthStatuses=await window.rexMonthlyMembership(q.data||[],date,'weekly');
+   }catch(e){monthStatusError=e?.message||'État du mois indisponible'}
+
    for(const item of list){const el=attach(item);if(el)render(el,item.uid,date)}
    lastKey=date+'|'+ids.join(',');refreshAt=Date.now();
   }catch(e){

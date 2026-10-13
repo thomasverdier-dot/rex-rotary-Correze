@@ -67,7 +67,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_6');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_7');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=4'),
@@ -99,7 +99,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@69b4e270773124dd283d92f32368a857d5f613e4/friday-point.js',
       local('beta/friday-weekly-entry.js?v=1'),
       local('beta/friday-wide-nextweek.js?v=3'),
-      local('beta/friday-signed-deals.js?v=4'),
+      local('beta/monthly-manual-promotion.js?v=2'),
+      local('beta/friday-signed-deals.js?v=5'),
       'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@0eeb53b8fc07332bd8a0397e53a5f2435703c7e8/friday-actions.js',
       local('beta/friday-action-manager.js?v=1'),
       local('beta/friday-checklist.js?v=3'),
@@ -111,8 +112,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-accordion.js?v=1'),
       local('beta/friday-readability.js?v=3'),
       local('beta/friday-seller-comment.js?v=1'),
-      local('beta/friday-splus1-editor.js?v=2'),
-      local('beta/monthly-manual-promotion.js?v=1')
+      local('beta/friday-splus1-editor.js?v=3')
     ];
     for(const src of modules)await addScript(doc,src);
     await unregisterWorkers();
