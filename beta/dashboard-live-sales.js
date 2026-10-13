@@ -82,9 +82,9 @@
     const p=page();if(!p)return null;
     updateStyle();let node=p.querySelector('#'+ROOT);
     if(!node){node=document.createElement('section');node.id=ROOT;node.innerHTML='<p>Chargement du suivi des ventes…</p>';p.appendChild(node)}
-    const annual=p.querySelector('#dashboardSalesKpis'),head=p.querySelector('.rex-page-head');
-    if(annual && annual.nextElementSibling!==node)annual.insertAdjacentElement('afterend',node);
-    else if(!annual&&head && head.nextElementSibling!==node)head.insertAdjacentElement('afterend',node);
+    const comparison=p.querySelector('#rexHistoryComparison'),annual=p.querySelector('#dashboardSalesKpis'),head=p.querySelector('.rex-page-head');
+    const anchor=comparison||annual||head;
+    if(anchor&&anchor.nextElementSibling!==node)anchor.insertAdjacentElement('afterend',node);
     return node;
   }
   // Ne pas détruire les panneaux et sélections du tableau de bord si les données sont inchangées.
