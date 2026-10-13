@@ -135,7 +135,7 @@
    if(lastOutput===output&&box.querySelector('#rxhMonth'))return;
    const layout=`<div class="rxh-heading">
       <div><div class="rxh-eyebrow">CRM REX-ROTARY CORRÈZE · VUE RESPONSABLE</div><h3>Analyse comparative des résultats</h3>
-       <p>CA signé du CRM comparé aux chiffres N-1 saisis par le responsable.</p></div>
+       <p>CA signé du CRM comparé aux chiffres historiques attribués à chaque commercial. Les anciens montants enregistrés uniquement par secteur doivent être affectés à la bonne personne avant d’apparaître ici.</p></div>
       <div class="rxh-controls"><label for="rxhMonth">Période</label><input type="month" id="rxhMonth" value="${iso(year,month)}"><button id="rxhReload" type="button">↻ Actualiser</button></div>
      </div>
      <div class="rxh-kpis">
@@ -156,7 +156,7 @@
             <span class="rxh-bar rxh-bar-last ${x.last==null?'rxh-no-data':''}" title="${safe(x.name)} ${historyYear} : ${fmt(x.last)}" style="height:${pct(x.last)}%"></span>
            </div><small>${safe(x.name)}</small></div>`).join('')}
      </div>
-     <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Le total N-1 agence reste indisponible si un vendeur manque. Le NC et l'UC sont inclus dans le CA.</p></div>
+     <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Les anciens chiffres saisis par secteur ne sont pas associés automatiquement à un commercial. Le total N-1 agence reste indisponible si un vendeur manque. Le NC et l'UC sont inclus dans le CA.</p></div>
      <details class="rxh-editor" id="rxhEditor" ${editorOpen?'open':''}>
        <summary>✎ Saisir ou corriger le CA, NC et UC de ${historyYear}, mois par mois et par vendeur</summary>
        <p>Uniquement visible et modifiable par le responsable. Montants à saisir en <b>euros</b> : ils sont enregistrés dans le suivi CA fiscal existant (qui utilise les k€).</p>
