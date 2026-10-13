@@ -59,6 +59,7 @@
     const btn=e.target.closest('button[data-action][data-id]');if(!btn)return;
     if(btn.dataset.action==='edit')startEdit(id,el,btn.dataset.id);
     if(btn.dataset.action==='delete')remove(id,el,btn.dataset.id);
+    if(btn.dataset.action==='month')promote(id,el,btn.dataset.id,btn);
    });
   }
   return el;
@@ -67,7 +68,17 @@
   const list=items.get(id)||[],cl=list.filter(x=>x.client_type==='acquis').reduce((sum,x)=>sum+Number(x.amount||0),0),nc=list.filter(x=>x.client_type==='nouveau').reduce((sum,x)=>sum+Number(x.amount||0),0);
   el.querySelector('.fp-edit-week').textContent='Semaine du '+new Date(date+'T12:00:00').toLocaleDateString('fr-FR');
   el.querySelector('.fp-edit-totals').innerHTML=`<span>CL : ${euro(cl)}</span><span>NC : ${euro(nc)}</span><span>Total : ${euro(cl+nc)}</span>`;
-  el.querySelector('.fp-edit-wrap').innerHTML=list.length?`<table class="fp-edit-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Prob.</th><th>RDV</th><th>Actions</th></tr></thead><tbody>${list.map(x=>`<tr data-id="${esc(x.id)}"><td>${esc(x.company_name)}</td><td>${euro(x.amount)}</td><td>${x.client_type==='nouveau'?'NC':'CL'}</td><td>${x.client_type==='nouveau'?'—':x.sale_type==='up_sell'||x.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(x.probability)||0}%</td><td>${x.negotiation_meeting_scheduled?'Oui':'—'}</td><td>${canEdit(id)?`<button type="button" data-action="edit" data-id="${esc(x.id)}">Modifier</button><button type="button" data-action="delete" data-id="${esc(x.id)}">Supprimer</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:14px;color:#64748b">Aucune affaire prévue pour S+1.</div>';
+  el.querySelector('.fp-edit-wrap').innerHTML=list.length?`<table class="fp-edit-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Prob.</th><th>RDV</th><th>Actions</th></tr></thead><tbody>${list.map(x=>`<tr data-id="${esc(x.id)}"><td>${esc(x.company_name)}</td><td>${euro(x.amount)}</td><td>${x.client_type==='nouveau'?'NC':'CL'}</td><td>${x.client_type==='nouveau'?'—':x.sale_type==='up_sell'||x.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(x.probability)||0}%</td><td>${x.negotiation_meeting_scheduled?'Oui':'—'}</td><td>${canEdit(id)?`<button type="button" data-action="month" data-id="${esc(x.id)}">Ajouter au mois</button><button type="button" data-action="edit" data-id="${esc(x.id)}">Modifier</button><button type="button" data-action="delete" data-id="${esc(x.id)}">Supprimer</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:14px;color:#64748b">Aucune affaire prévue pour S+1.</div>';
+ }
+ async function promote(id,el,recordId,btn){
+  const row=(items.get(id)||[]).find(x=>x.id===recordId),message=el.querySelector('.fp-edit-status');
+  if(!row||!window.rexPromoteToMonth)return;
+  btn.disabled=true;
+  try{
+    const result=await window.rexPromoteToMonth(row,nextDate(),'forecast');
+    message.textContent=result.message;message.classList.toggle('error',!result.ok&&!result.already);
+    if(result.ok||result.already){btn.textContent='Déjà au mois';btn.disabled=true}
+  }finally{if(btn.textContent!=='Déjà au mois')btn.disabled=false}
  }
  function startEdit(id,el,recordId){
   const row=(items.get(id)||[]).find(x=>x.id===recordId),form=el.querySelector('form');if(!row||!form)return;
