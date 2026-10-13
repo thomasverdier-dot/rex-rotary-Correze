@@ -67,11 +67,11 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_13');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_14');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=4'),
-      local('beta/monthly-forecast.js?v=8'),
+      local('beta/monthly-forecast.js?v=9'),
 
       local('ui-v3.js?v=2'),
       local('beta/admin-seller-management.js?v=1'),
@@ -120,7 +120,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
     // Le CSS est isolé au prévisionnel mensuel : aucune logique métier modifiée.
     const freshStyle=doc.createElement('link');
     freshStyle.rel='stylesheet';
-    freshStyle.href=local('beta/monthly-visual-refresh.css?v=1');
+    freshStyle.href=local('beta/monthly-visual-refresh.css?v=2');
     const styleReady=new Promise(resolve=>{
       freshStyle.onload=()=>resolve(true);
       freshStyle.onerror=()=>resolve(false);
