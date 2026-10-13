@@ -111,7 +111,7 @@
   }
   // La semaine commerciale commence lundi et s'acheve vendredi.
   function validSignatureDate(date){
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date||''))return false;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return false;
     const day=new Date(date+'T12:00:00').getDay();
     return day>=1&&day<=5;
   }
