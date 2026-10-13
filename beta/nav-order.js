@@ -29,8 +29,18 @@
     const nav=document.querySelector('#rexShellV3 .rex-nav'),btn=document.getElementById('ticketNavBtn');
     if(!nav)return false;
     cleanSectors();
-    if(!btn)return true;
-    if(nav.lastElementChild!==btn){busy=true;nav.appendChild(btn);busy=false}
+    // Administration reste immédiatement après le Point vendredi, sans
+    // modifier les boutons ni leurs permissions ou leurs gestionnaires.
+    const friday=nav.querySelector('button[data-page="friday"]');
+    const admin=nav.querySelector('button[data-page="admin"]');
+    if(friday?.parentElement===nav&&admin?.parentElement===nav&&
+       admin.previousElementSibling!==friday){
+      busy=true;
+      friday.insertAdjacentElement('afterend',admin);
+      busy=false;
+    }
+    // Améliorations conserve sa place séparée, tout en bas du menu.
+    if(btn&&nav.lastElementChild!==btn){busy=true;nav.appendChild(btn);busy=false}
     return true
   }
   let obs=null,tries=0;
