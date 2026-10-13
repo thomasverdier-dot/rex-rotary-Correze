@@ -1,0 +1,503 @@
+/*
+ * Rex-Rotary Corrèze — Prévisionnel mois, présentation épurée.
+ * Styles uniquement : aucune logique de vente, requête ou permission modifiée.
+ * Périmètre strict : .rex-page[data-page="monthly"].
+ */
+.rex-page[data-page="monthly"] {
+  --mm-ink: #23364d;
+  --mm-muted: #748195;
+  --mm-line: #e5eaf0;
+  --mm-green: #16754e;
+  --mm-green-soft: #f1faf5;
+  --mm-blue: #183d6b;
+  color: var(--mm-ink);
+}
+
+/* En-tête simple, sans carte englobante */
+.rex-page[data-page="monthly"] .mm-head {
+  align-items: center;
+  margin: 1px 0 18px;
+  gap: 16px;
+}
+.rex-page[data-page="monthly"] .mm-head h2 {
+  color: #192c46;
+  font-size: clamp(22px, 2vw, 27px);
+  font-weight: 750;
+  letter-spacing: -.5px;
+}
+.rex-page[data-page="monthly"] .mm-head p {
+  color: var(--mm-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 690px;
+}
+.rex-page[data-page="monthly"] .mm-month label {
+  color: var(--mm-muted);
+  font-size: 10px;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.rex-page[data-page="monthly"] .mm-month input {
+  min-height: 38px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid #dce4ec;
+  box-shadow: none;
+  font-size: 12px;
+}
+.rex-page[data-page="monthly"] .mm-note {
+  margin: 0 0 19px;
+  padding: 3px 0 3px 12px;
+  max-width: 1100px;
+  border: 0;
+  border-left: 2px solid #8bb8a4;
+  border-radius: 0;
+  background: transparent;
+  color: #687789;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.rex-page[data-page="monthly"] .mm-note b {
+  color: #346b56;
+}
+
+/* Un ruban de résultats au lieu de quatre grosses tuiles */
+.rex-page[data-page="monthly"] .mm-agency {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 13px 5px;
+  border: 1px solid var(--mm-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-kpi {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid #e8edf2;
+  border-radius: 0;
+  background: transparent;
+  padding: 1px 17px 2px;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-kpi:last-child {
+  border-right: 0;
+}
+.rex-page[data-page="monthly"] .mm-kpi span {
+  color: var(--mm-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.rex-page[data-page="monthly"] .mm-kpi strong {
+  margin-top: 6px;
+  color: #223951;
+  font-size: clamp(17px, 1.65vw, 23px);
+  font-weight: 770;
+  letter-spacing: -.4px;
+  line-height: 1.24;
+  font-variant-numeric: tabular-nums;
+}
+.rex-page[data-page="monthly"] .mm-kpi:last-child strong {
+  color: var(--mm-blue);
+}
+.rex-page[data-page="monthly"] .mm-status {
+  margin: 0 2px 12px;
+  font-size: 11px;
+  color: #8b97a7;
+}
+
+/* Une ligne par vendeur : tableau large, pas de colonnes de cartes */
+.rex-page[data-page="monthly"] .mm-grid,
+.rex-page[data-page="monthly"] .mm-grid.seller-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.rex-page[data-page="monthly"] .mm-card {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--mm-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-title {
+  margin: 0;
+  padding: 16px 20px 13px;
+  align-items: baseline;
+  border-bottom: 1px solid #eef1f5;
+}
+.rex-page[data-page="monthly"] .mm-title h3 {
+  color: #263951;
+  font-size: 16px;
+  font-weight: 770;
+  letter-spacing: -.2px;
+}
+.rex-page[data-page="monthly"] .mm-title span {
+  color: #8895a6;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rex-page[data-page="monthly"] .mm-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5df #f8fafc;
+}
+
+/* Tableau lisible et très peu encadré */
+.rex-page[data-page="monthly"] .mm-table {
+  width: 100%;
+  min-width: 1030px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  color: #38495d;
+}
+.rex-page[data-page="monthly"] .mm-table th {
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid #edf1f5;
+  background: #fbfcfd;
+  color: #7c8999;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+  font-size: 10px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+.rex-page[data-page="monthly"] .mm-table td {
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid #eff2f6;
+  background: transparent;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.rex-page[data-page="monthly"] .mm-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.rex-page[data-page="monthly"] .mm-table tbody tr:hover td {
+  background: #f7f9fc;
+}
+.rex-page[data-page="monthly"] .mm-table td:first-child b {
+  color: #243a56;
+  font-weight: 720;
+}
+.rex-page[data-page="monthly"] .mm-table tr.mm-completed {
+  background: #f6fbf8 !important;
+}
+.rex-page[data-page="monthly"] .mm-table tr.mm-completed td:first-child {
+  border-left: 3px solid #70b88e;
+  padding-left: 9px;
+}
+.rex-page[data-page="monthly"] .mm-table tr.mm-completed td {
+  border-bottom-color: #edf4ef;
+}
+.rex-page[data-page="monthly"] .mm-table tr.mm-completed:hover td {
+  background: #f0f8f3;
+}
+.rex-page[data-page="monthly"] .mm-table tr.mm-sign-pending {
+  background: #fffbf0 !important;
+}
+
+/* Prévision : champ et action discrets sur une seule ligne */
+.rex-page[data-page="monthly"] .mm-amount-edit {
+  gap: 5px;
+}
+.rex-page[data-page="monthly"] .mm-amount-input {
+  box-sizing: border-box;
+  width: 76px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 7px;
+  border: 1px solid #dae2eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #2e4258;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.rex-page[data-page="monthly"] .mm-amount-unit {
+  min-width: 17px;
+  color: #738195;
+  font-size: 10px;
+}
+.rex-page[data-page="monthly"] .mm-amount-save {
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #256f58;
+  font-size: 10px;
+  font-weight: 800;
+}
+.rex-page[data-page="monthly"] .mm-amount-save:hover {
+  background: #ecf8f1;
+}
+.rex-page[data-page="monthly"] .mm-date-signature {
+  box-sizing: border-box;
+  min-height: 34px;
+  max-width: 142px;
+  padding: 5px 7px;
+  border: 1px solid #dce4ec;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 11px;
+}
+.rex-page[data-page="monthly"] .mm-date-help {
+  color: #b07835;
+  font-size: 10px;
+  max-width: 145px;
+}
+.rex-page[data-page="monthly"] .mm-sale-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 720;
+  color: #326a50;
+  white-space: nowrap;
+}
+.rex-page[data-page="monthly"] .mm-complete-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #258960;
+}
+
+/* Montant signé : simple ligne éditable, aucune grosse boîte verte */
+.rex-page[data-page="monthly"] .mm-sign-panel {
+  display: grid;
+  grid-template-columns: minmax(102px, 1fr) auto;
+  column-gap: 7px;
+  row-gap: 6px;
+  align-items: end;
+  width: max-content;
+  max-width: min(330px, 100%);
+  min-width: 0;
+  margin: 8px 0 0 1px;
+  padding: 1px 0 0 12px;
+  border: 0;
+  border-left: 2px solid #a0d0b3;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-sign-panel[hidden] {
+  display: none !important;
+}
+.rex-page[data-page="monthly"] .mm-sign-panel label {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #28805b;
+  font-size: 10px;
+  font-weight: 820;
+}
+.rex-page[data-page="monthly"] .mm-sign-amount {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #c5dbd0;
+  border-radius: 7px;
+  background: #fff;
+  color: #24523d;
+  font-size: 12px;
+  font-weight: 740;
+  font-variant-numeric: tabular-nums;
+}
+.rex-page[data-page="monthly"] .mm-sign-save {
+  width: auto;
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid #cce9d7;
+  border-radius: 7px;
+  background: #e9f7ee;
+  color: #216c49;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 800;
+}
+.rex-page[data-page="monthly"] .mm-sign-save:hover {
+  background: #d8f1e1;
+}
+.rex-page[data-page="monthly"] .mm-sign-panel small {
+  display: none;
+}
+.rex-page[data-page="monthly"] .mm-del {
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: transparent;
+  color: #bb7d82;
+  font-size: 13px;
+}
+.rex-page[data-page="monthly"] .mm-del:hover {
+  background: #fff0f0;
+  color: #b42318;
+}
+
+/* Ajout d'affaire : intégré à la fiche, plus de sous-carte */
+.rex-page[data-page="monthly"] .mm-form {
+  margin: 0;
+  padding: 16px 20px 14px;
+  border: 0;
+  border-top: 1px solid #eaeef3;
+  border-radius: 0;
+  background: #fff;
+}
+.rex-page[data-page="monthly"] .mm-form-grid {
+  grid-template-columns: minmax(175px, 2fr) minmax(110px, 1fr) minmax(145px, 1.15fr) minmax(145px, 1.15fr);
+  gap: 12px;
+}
+.rex-page[data-page="monthly"] .mm-form-grid.nouveau-client {
+  grid-template-columns: minmax(175px, 2fr) minmax(110px, 1fr) minmax(145px, 1.15fr);
+}
+.rex-page[data-page="monthly"] .mm-field label {
+  margin-bottom: 5px;
+  color: #8794a5;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .01em;
+}
+.rex-page[data-page="monthly"] .mm-field input,
+.rex-page[data-page="monthly"] .mm-field select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 37px;
+  padding: 8px 10px;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #344860;
+  font-size: 12px;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-form-row2 {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 13px;
+  margin-top: 12px;
+}
+.rex-page[data-page="monthly"] .mm-form-row2 > .mm-field {
+  flex: 0 1 138px;
+}
+.rex-page[data-page="monthly"] .mm-check {
+  box-sizing: border-box;
+  min-height: 37px;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #607085;
+  font-size: 11px;
+}
+.rex-page[data-page="monthly"] .mm-add {
+  min-height: 37px;
+  padding: 8px 15px;
+  border: 0;
+  border-radius: 8px;
+  background: #183d6b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 790;
+  box-shadow: none;
+}
+.rex-page[data-page="monthly"] .mm-add:hover {
+  background: #285584;
+}
+
+/* Un pied de page léger : petits totaux, pas quatre nouveaux badges */
+.rex-page[data-page="monthly"] .mm-totals {
+  display: flex;
+  gap: 5px 0;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 11px 16px;
+  border-top: 1px solid #edf0f4;
+  background: #fafbfd;
+}
+.rex-page[data-page="monthly"] .mm-pill {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  border: 0;
+  border-right: 1px solid #dfe6ed;
+  border-radius: 0;
+  padding: 2px 13px;
+  background: transparent;
+  color: #788598;
+  font-size: 11px;
+}
+.rex-page[data-page="monthly"] .mm-pill:last-child {
+  border-right: 0;
+  color: #244669;
+}
+.rex-page[data-page="monthly"] .mm-pill b {
+  color: #2a4059;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Clavier, contraste, petits écrans */
+.rex-page[data-page="monthly"] input:focus-visible,
+.rex-page[data-page="monthly"] select:focus-visible,
+.rex-page[data-page="monthly"] button:focus-visible {
+  outline: 2px solid #4282c5;
+  outline-offset: 2px;
+}
+@media (max-width: 1080px) {
+  .rex-page[data-page="monthly"] .mm-agency {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+  .rex-page[data-page="monthly"] .mm-kpi:nth-child(2) {
+    border-right: 0;
+  }
+  .rex-page[data-page="monthly"] .mm-kpi:nth-child(n+3) {
+    padding-top: 12px;
+    border-top: 1px solid #edf1f5;
+  }
+  .rex-page[data-page="monthly"] .mm-form-grid,
+  .rex-page[data-page="monthly"] .mm-form-grid.nouveau-client {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .rex-page[data-page="monthly"] .mm-head h2 {
+    font-size: 22px;
+  }
+  .rex-page[data-page="monthly"] .mm-agency {
+    padding: 10px 1px;
+  }
+  .rex-page[data-page="monthly"] .mm-kpi {
+    padding: 5px 11px;
+  }
+  .rex-page[data-page="monthly"] .mm-kpi strong {
+    font-size: 19px;
+  }
+  .rex-page[data-page="monthly"] .mm-title {
+    padding: 14px 13px;
+  }
+  .rex-page[data-page="monthly"] .mm-form {
+    padding: 14px 13px;
+  }
+  .rex-page[data-page="monthly"] .mm-form-grid,
+  .rex-page[data-page="monthly"] .mm-form-grid.nouveau-client {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rex-page[data-page="monthly"] .mm-form-row2 > .mm-field {
+    flex: 1 1 100%;
+  }
+  .rex-page[data-page="monthly"] .mm-pill {
+    padding: 3px 10px;
+  }
+}
