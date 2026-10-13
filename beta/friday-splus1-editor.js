@@ -107,7 +107,7 @@
   try{
    const q=recordId?await client.from(TABLE).update(values).eq('id',recordId).eq('user_id',id).eq('week_start',date):await client.from(TABLE).insert({...values,user_id:id,week_start:date});
    if(q.error)throw q.error;
-   msg.textContent='Affaire enregistrée.';editing.delete(id);form.reset();form.classList.remove('fp-edit-new');btn.textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true;await load();
+   msg.textContent='Affaire enregistrée.';editing.delete(id);form.reset();form.classList.remove('fp-edit-new');btn.textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true;window.dispatchEvent(new Event('rex:weekly-forecast-synced'));await load();
   }catch(e){msg.textContent='Erreur : '+(e?.message||e);msg.classList.add('error')}finally{btn.disabled=false}
  }
  async function remove(id,el,recordId){
@@ -115,7 +115,7 @@
   const client=db(),date=nextDate();if(!client||!date)return;
   const r=await client.from(TABLE).delete().eq('id',recordId).eq('user_id',id).eq('week_start',date);
   if(r.error){const msg=el.querySelector('.fp-edit-status');if(msg){msg.textContent=r.error.message;msg.classList.add('error')}return}
-  if(editing.get(id)===recordId)el.querySelector('.fp-edit-cancel')?.click();await load();
+  if(editing.get(id)===recordId)el.querySelector('.fp-edit-cancel')?.click();window.dispatchEvent(new Event('rex:weekly-forecast-synced'));await load();
  }
  async function load(){
   const date=nextDate(),list=boxes(),client=db();if(!date||!list.length||!client||busy)return;
