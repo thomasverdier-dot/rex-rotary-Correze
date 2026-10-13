@@ -1,7 +1,6 @@
 (function comparisonModule(){
  'use strict';
  const ROOT='rexHistoryComparison';
- const SECTORS=[1,2,3,4];
  const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
  const currency=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
  const fmt=c=>c==null?'Non renseigné':currency.format(c/100);
@@ -21,14 +20,14 @@
  let year=now.getFullYear(),month=now.getMonth()+1,people=[],selectedSeller='',metric='ca',
      rows=[],sales=[],loaded=false,busy=false,pending=false,saving=false,lastFetch=0,timer=null,
      message='',messageType='',editorOpen=false,historyOpen=true,active=false,lastOutput='';
- function rowKey(sec,y,m){return `${Number(sec)}|${iso(y,m)}`}
+ function rowKey(uid,y,m){return `${uid}|${iso(y,m)}`}
  function historyMap(records){
    const map=new Map();
    for(const r of records){
      const fy=Number(r.fiscal_start_year),idx=Number(r.month_index);
      if(idx<1||idx>12)continue;
      const cy=idx<=9?fy:fy+1, cm=idx<=9?idx+3:idx-9;
-     map.set(rowKey(r.sector_id,cy,cm),r);
+     map.set(rowKey(r.user_id,cy,cm),r);
    }
    return map;
  }
@@ -37,11 +36,7 @@
    for(const x of deals){
      const date=String(x.signature_date||'').slice(0,7),user=x.user_id;
      if(!/^\d{4}-\d{2}$/.test(date)||!user)continue;
-     // Les archives fiscales sont par secteur, donc regrouper aussi les
-     // signatures du CRM par le secteur actuellement attribué à chaque compte.
-     const sector=people.find(p=>p.user_id===user)?.sector_id;
-     if(!SECTORS.includes(Number(sector)))continue;
-     const k=`${Number(sector)}|${date}`,v=map.get(k)||{ca:0,nc:0,upcross:0,count:0};
+     const k=`${user}|${date}`,v=map.get(k)||{ca:0,nc:0,upcross:0,count:0};
      const amount=money(x.signed_amount_eur);
      v.ca+=amount;
      if(x.client_type==='nouveau')v.nc+=amount;
@@ -52,48 +47,38 @@
    return map;
  }
  function compute(){
-   const hist=historyMap(rows),signed=signedMap(sales),current=hist;
-   const signedMonths=sales.filter(x=>x.signature_date).map(x=>String(x.signature_date).slice(0,7)).sort();
-   const first=signedMonths[0]||null;
+   const hist=historyMap(rows),current=signedMap(sales);
+   const first=monthFirst(sales);
+   function monthFirst(s){const sorted=s.filter(x=>x.signature_date).map(x=>String(x.signature_date).slice(0,7)).sort();return sorted[0]||null}
+   // Avant la première signature enregistrée, les archives mensuelles sont incomplètes.
    const nowPeriod=iso(now.getFullYear(),now.getMonth()+1);
-   const historicalData=(sec,y,m,field)=>{
-     const row=hist.get(rowKey(sec,y,m));return row? kilo(row[field]):null;
+   const currentData=(uid,y,m,field)=>{
+     if(iso(y,m)>nowPeriod||!first||iso(y,m)<first)return null;
+     return current.get(rowKey(uid,y,m))?.[field]??0;
    };
-   const currentData=(sec,y,m,field)=>{
-     const period=iso(y,m),fiscalValue=historicalData(sec,y,m,field);
-     if(period>nowPeriod)return null;
-     // Mois fiscal clôturé : le CA déclaré au logiciel métier fait foi.
-     if(period<nowPeriod&&fiscalValue!==null)return fiscalValue;
-     // Mois en cours : priorité aux ventes CRM signées (suivi en direct).
-     const live=signed.get(rowKey(sec,y,m));
-     if(period===nowPeriod&&live)return live[field];
-     if(fiscalValue!==null)return fiscalValue;
-     // Pas de résultat avant les premières signatures suivies par le CRM.
-     if(first&&period>=first)return live?.[field]??0;
-     return null;
+   const historicalData=(uid,y,m,field)=>{
+     const x=hist.get(rowKey(uid,y,m));return x? kilo(x[field]):null;
    };
-   const actual=(sec,y,m,field)=>currentData(sec,y,m,field);
-   const historic=(sec,y,m,field)=>historicalData(sec,y,m,field);
+   const sumMaybe=(items)=>{const entries=items.filter(x=>x!=null);return entries.length?entries.reduce((a,b)=>a+b,0):null};
+   const actual=(uid,y,m,field)=>currentData(uid,y,m,field);
+   const historic=(uid,y,m,field)=>historicalData(uid,y,m,field);
+   // Un total agence n'est comparable que si chaque vendeur possède une ligne
+   // d'historique N-1. Sinon, signaler clairement la donnée manquante.
    const totals=(y,m,field,source)=>{
-     const values=SECTORS.map(sec=>source(sec,y,m,field));
-     return values.every(x=>x!==null)?values.reduce((a,b)=>a+b,0):null;
+     const entries=people.map(p=>source(p.user_id,y,m,field));
+     return entries.length&&entries.every(v=>v!==null)?entries.reduce((a,b)=>a+b,0):null;
    };
    const before=prev(year,month);
-   const totCur=totals(year,month,'ca',actual),
-     totPrev=totals(before.year,before.month,'ca',actual),
-     totLast=totals(year-1,month,'ca',historic);
-   const data=SECTORS.map(sec=>{
-     const assigned=people.filter(p=>Number(p.sector_id)===sec);
-     const name=assigned.map(p=>p.display_name||'Commercial').join(', ');
-     const get=(y,m,field)=>actual(sec,y,m,field);
-     const histGet=(y,m,field)=>historic(sec,y,m,field);
-     return {sector:sec,name,ca:get(year,month,'ca'),nc:get(year,month,'nc'),uc:get(year,month,'upcross'),
+   const totCur=totals(year,month,'ca',actual),totPrev=totals(before.year,before.month,'ca',actual),
+      totLast=totals(year-1,month,'ca',historic);
+   const data=people.map(p=>{
+     const get=(y,m,field)=>actual(p.user_id,y,m,field);
+     const histGet=(y,m,field)=>historic(p.user_id,y,m,field);
+     return {person:p,ca:get(year,month,'ca'),nc:get(year,month,'nc'),uc:get(year,month,'upcross'),
        prev:get(before.year,before.month,'ca'),last:histGet(year-1,month,'ca'),
        lastNc:histGet(year-1,month,'nc'),lastUc:histGet(year-1,month,'upcross')};
    });
-   const currentSource=SECTORS.some(sec=>hist.has(rowKey(sec,year,month)))&&iso(year,month)<nowPeriod?
-     'Suivi CA fiscal':'Ventes validées CRM / fiscal';
-   return {hist,current,signed,first,nowPeriod,currentData,historicalData,actual,historic,totals,before,totCur,totPrev,totLast,data,currentSource};
+   return {hist,current,first,nowPeriod,currentData,historicalData,actual,historic,totals,before,totCur,totPrev,totLast,data};
  }
  function delta(value,base){
    if(value==null||base==null)return '<span class="rxh-muted">—</span>';
@@ -119,7 +104,7 @@
    const box=mount();if(!box||!loaded)return;
    if(box.querySelector('.rxh-history-editor input:focus'))return;
    const result=compute(),{hist,data,totCur,totPrev,totLast,before}=result;
-   const mlabel=MONTHS[month-1],name='Secteur '+selectedSeller;
+   const mlabel=MONTHS[month-1],name=people.find(p=>p.user_id===selectedSeller)?.display_name||'Commercial';
    const years=[year,year-1],historyYear=year-1;
    const metricLabel=metric==='ca'?'CA':metric==='nc'?'NC':'UC';
    const chartPoints=MONTHS.map((m,i)=>{
@@ -139,31 +124,30 @@
      };
      return `<tr data-month="${cm}"><td>${safe(m)}</td><td>${input('ca')}</td><td>${input('nc')}</td><td>${input('upcross')}</td><td><span class="${x?'rxh-entered':'rxh-muted'}">${x?'Enregistré':'À saisir'}</span></td></tr>`;
    }).join('');
-   const dataRows=data.map(d=>`<tr><th scope="row">Secteur ${d.sector} <small>${safe(d.name||'Non affecté actuellement')}</small></th>
+   const dataRows=data.map(d=>`<tr><th scope="row">${safe(d.person.display_name||'Commercial')} <small>S${safe(d.person.sector_id||'—')}</small></th>
         <td><strong>${fmt(d.ca)}</strong></td><td>${fmt(d.prev)}</td><td>${fmt(d.last)}</td>
         <td>${delta(d.ca,d.prev)}</td><td>${delta(d.ca,d.last)}</td>
-        <td>${fmt(d.nc)}</td><td>${fmt(d.lastNc)}</td><td>${fmt(d.uc)}</td><td>${fmt(d.lastUc)}</td></tr>`).join('');
+        <td>${fmt(d.nc)}</td><td>${fmt(d.uc)}</td></tr>`).join('');
    const summary=`<tr class="rxh-total"><th>Agence Corrèze</th><td>${fmt(totCur)}</td><td>${fmt(totPrev)}</td><td>${fmt(totLast)}</td><td>${delta(totCur,totPrev)}</td><td>${delta(totCur,totLast)}</td>
-        <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year-1,month,'nc',result.historic))}</td>
-        <td>${fmt(result.totals(year,month,'upcross',result.actual))}</td><td>${fmt(result.totals(year-1,month,'upcross',result.historic))}</td></tr>`;
-   const nonEntered=SECTORS.filter(sec=>!hist.get(rowKey(sec,historyYear,month))).length;
+        <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year,month,'upcross',result.actual))}</td></tr>`;
+   const nonEntered=people.filter(p=>!hist.get(rowKey(p.user_id,historyYear,month))).length;
    const output=JSON.stringify([year,month,people,data,rows,sales,metric,selectedSeller,editorOpen,historyOpen,message,messageType]);
    if(lastOutput===output&&box.querySelector('#rxhMonth'))return;
    const layout=`<div class="rxh-heading">
       <div><div class="rxh-eyebrow">CRM REX-ROTARY CORRÈZE · VUE RESPONSABLE</div><h3>Analyse comparative des résultats</h3>
-       <p>Comparatif des secteurs : CA fiscal enregistré pour les mois clôturés, ventes signées CRM pour le mois en cours.</p></div>
+       <p>CA signé du CRM comparé aux chiffres historiques attribués à chaque commercial. Les anciens montants enregistrés uniquement par secteur doivent être affectés à la bonne personne avant d’apparaître ici.</p></div>
       <div class="rxh-controls"><label for="rxhMonth">Période</label><input type="month" id="rxhMonth" value="${iso(year,month)}"><button id="rxhReload" type="button">↻ Actualiser</button></div>
      </div>
      <div class="rxh-kpis">
-       <article class="rxh-kpi"><span>CA réalisé · ${safe(mlabel)} ${year}</span><strong>${fmt(totCur)}</strong><small>${totCur==null?'Non disponible':safe(result.currentSource)}</small></article>
+       <article class="rxh-kpi"><span>CA réalisé · ${safe(mlabel)} ${year}</span><strong>${fmt(totCur)}</strong><small>${totCur==null?'Non disponible': 'Signatures validées en euros'}</small></article>
        <article class="rxh-kpi"><span>CA M-1 · ${safe(MONTHS[before.month-1])} ${before.year}</span><strong>${fmt(totPrev)}</strong><small>${delta(totCur,totPrev)} par rapport à M-1</small></article>
        <article class="rxh-kpi"><span>CA N-1 · ${safe(mlabel)} ${historyYear}</span><strong>${fmt(totLast)}</strong><small>${delta(totCur,totLast)} par rapport à N-1</small></article>
-       <article class="rxh-kpi"><span>Écart € vs N-1</span><strong>${totCur==null||totLast==null?'—':fmt(totCur-totLast)}</strong><small>${totLast==null?`${nonEntered} secteur(s) encore à renseigner`:'Comparaison des deux mêmes mois'}</small></article>
+       <article class="rxh-kpi"><span>Écart € vs N-1</span><strong>${totCur==null||totLast==null?'—':fmt(totCur-totLast)}</strong><small>${totLast==null?`${nonEntered} vendeur(s) encore à renseigner`:'Comparaison des deux mêmes mois'}</small></article>
      </div>
-     <div class="rxh-panel"><div class="rxh-panel-head"><div><h4>Comparatif des résultats par secteur</h4><p>Évolution CA du secteur : mois actuel, M-1 et même mois N-1. Les noms correspondent à l'affectation actuelle.</p></div></div>
-     <div class="rxh-scroll"><table class="rxh-table"><thead><tr><th>Secteur / vendeur actuel</th><th>CA actuel</th><th>CA M-1</th><th>CA N-1</th><th>Vs M-1</th><th>Vs N-1</th><th>NC actuel</th><th>NC N-1</th><th>UC actuel</th><th>UC N-1</th></tr></thead><tbody>${dataRows}${summary}</tbody></table></div></div>
-     <div class="rxh-panel"><div class="rxh-panel-head rxh-historic-head"><div><h4>Historique mensuel par secteur</h4><p>${metricLabel} ${year} / ${historyYear} · seules les périodes renseignées sont représentées.</p></div>
-       <div class="rxh-small-controls"><label for="rxhSeller">Secteur</label><select id="rxhSeller">${SECTORS.map(sec=>`<option value="${sec}" ${Number(selectedSeller)===sec?'selected':''}>Secteur ${sec} ${safe(people.filter(p=>Number(p.sector_id)===sec).map(p=>p.display_name).join(', ')||'· non affecté')}</option>`).join('')}</select>
+     <div class="rxh-panel"><div class="rxh-panel-head"><div><h4>Performance des commerciaux</h4><p>Évolution CA individuel : mois actuel, M-1 et même mois l'année précédente</p></div></div>
+     <div class="rxh-scroll"><table class="rxh-table"><thead><tr><th>Commercial</th><th>CA actuel</th><th>CA M-1</th><th>CA N-1</th><th>Vs M-1</th><th>Vs N-1</th><th>NC actuel</th><th>UC actuel</th></tr></thead><tbody>${dataRows}${summary}</tbody></table></div></div>
+     <div class="rxh-panel"><div class="rxh-panel-head rxh-historic-head"><div><h4>Historique mensuel par vendeur</h4><p>${metricLabel} ${year} / ${historyYear} · seules les périodes renseignées sont représentées.</p></div>
+       <div class="rxh-small-controls"><label for="rxhSeller">Commercial</label><select id="rxhSeller">${people.map(p=>`<option value="${safe(p.user_id)}" ${p.user_id===selectedSeller?'selected':''}>${safe(p.display_name||'Commercial')}</option>`).join('')}</select>
        <label for="rxhMetric">Indicateur</label><select id="rxhMetric"><option value="ca" ${metric==='ca'?'selected':''}>CA</option><option value="nc" ${metric==='nc'?'selected':''}>NC</option><option value="upcross" ${metric==='upcross'?'selected':''}>UC</option></select></div></div>
      <div class="rxh-legend"><i class="rxh-current-key"></i>${year} (signatures CRM) <i class="rxh-historic-key"></i>${historyYear} (historique saisi)</div>
      <div class="rxh-chart" role="img" aria-label="Comparaison ${metricLabel} par mois pour ${safe(name)} entre ${year} et ${historyYear}">
@@ -172,12 +156,12 @@
             <span class="rxh-bar rxh-bar-last ${x.last==null?'rxh-no-data':''}" title="${safe(x.name)} ${historyYear} : ${fmt(x.last)}" style="height:${pct(x.last)}%"></span>
            </div><small>${safe(x.name)}</small></div>`).join('')}
      </div>
-     <p class="rxh-note">Données réelles : mois clôturés issus du Suivi CA fiscal par secteur, mois en cours issu des signatures CRM (ou du fiscal si renseigné). Archives N-1 issues du Suivi CA fiscal. Les noms ne reconstituent pas l'affectation des commerciaux de l'année passée. « Non renseigné » ≠ 0 €. Total agence N-1 indisponible si un secteur manque. NC et UC sont compris dans le CA.</p></div>
+     <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Les anciens chiffres saisis par secteur ne sont pas associés automatiquement à un commercial. Le total N-1 agence reste indisponible si un vendeur manque. Le NC et l'UC sont inclus dans le CA.</p></div>
      <details class="rxh-editor" id="rxhEditor" ${editorOpen?'open':''}>
-       <summary>✎ Consulter ou corriger le CA, NC et UC de ${historyYear}, mois par mois et par secteur</summary>
-       <p>Uniquement visible et modifiable par le responsable. Les chiffres déjà renseignés dans « Suivi CA fiscal » remontent ici automatiquement. Montants modifiables en <b>euros</b> et convertis en k€ lors de l'enregistrement fiscal.</p>
-       <div class="rxh-editor-select"><label for="rxhEntrySeller">Secteur à renseigner</label>
-        <select id="rxhEntrySeller">${SECTORS.map(sec=>`<option value="${sec}" ${Number(selectedSeller)===sec?'selected':''}>Secteur ${sec}</option>`).join('')}</select>
+       <summary>✎ Saisir ou corriger le CA, NC et UC de ${historyYear}, mois par mois et par vendeur</summary>
+       <p>Uniquement visible et modifiable par le responsable. Montants à saisir en <b>euros</b> : ils sont enregistrés dans le suivi CA fiscal existant (qui utilise les k€).</p>
+       <div class="rxh-editor-select"><label for="rxhEntrySeller">Vendeur à renseigner</label>
+        <select id="rxhEntrySeller">${people.map(p=>`<option value="${safe(p.user_id)}" ${p.user_id===selectedSeller?'selected':''}>${safe(p.display_name||'Commercial')}</option>`).join('')}</select>
         <span>Année civile ${historyYear} · 12 mois</span>
        </div>
        <form id="rxhForm" class="rxh-history-editor"><div class="rxh-scroll"><table class="rxh-table rxh-entry-table"><thead><tr><th>Mois</th><th>CA (€)</th><th>NC (€)</th><th>UC (€)</th><th>État</th></tr></thead><tbody>${historyRows}</tbody></table></div>
@@ -196,7 +180,7 @@
    box.querySelector('#rxhReload').onclick=()=>load();
    box.querySelector('#rxhSeller').onchange=e=>{selectedSeller=e.target.value;lastOutput='';draw()};
    box.querySelector('#rxhMetric').onchange=e=>{metric=e.target.value;lastOutput='';draw()};
-   box.querySelector('#rxhEntrySeller').onchange=e=>{if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Les modifications en cours ne sont pas enregistrées. Changer de secteur ?')){e.target.value=selectedSeller;return}selectedSeller=e.target.value;lastOutput='';draw()};
+   box.querySelector('#rxhEntrySeller').onchange=e=>{if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Les modifications en cours ne sont pas enregistrées. Changer de vendeur ?')){e.target.value=selectedSeller;return}selectedSeller=e.target.value;lastOutput='';draw()};
    const editor=box.querySelector('#rxhEditor');
    editor.addEventListener('toggle',()=>{editorOpen=editor.open});
    const form=box.querySelector('#rxhForm');
@@ -207,7 +191,7 @@
  async function saveHistory(form){
    const client=getSb(),user=getUser();
    if(!isAdmin()||!client||!user||saving)return;
-   const hist=historyMap(rows),periodYear=year-1,sec=Number(selectedSeller);
+   const hist=historyMap(rows),periodYear=year-1,uid=selectedSeller;
    const changes=[];
    for(const tr of form.querySelectorAll('tbody tr[data-month]')){
      const m=Number(tr.dataset.month);
@@ -220,15 +204,16 @@
        values[field]=v===''?null:Number(v);
        if(values[field]!=null&&(!Number.isFinite(values[field])||values[field]>100000000)){setMessage('Montant trop important ou incorrect.','error');return}
      }
-     const original=hist.get(rowKey(sec,periodYear,m));
+     const original=hist.get(rowKey(uid,periodYear,m));
      if(count===0){if(original){setMessage(`Pour ${MONTHS[m-1]}, les anciens chiffres sont enregistrés : ne vide pas toute la ligne pour les effacer. Saisis des zéros pour indiquer un mois nul.`,'error');return}continue}
      if(count!==3){setMessage(`${MONTHS[m-1]} : complète CA, NC et UC (mets 0 si nécessaire).`,'error');return}
      if(values.nc>values.ca||values.upcross>values.ca){setMessage(`${MONTHS[m-1]} : NC et UC ne doivent pas dépasser le CA.`,'error');return}
      const f=fiscal(periodYear,m);
-     const change={fiscal_start_year:f.fiscal_start_year,month_index:f.month_index,sector_id:sec,
+     const change={fiscal_start_year:f.fiscal_start_year,month_index:f.month_index,user_id:uid,
        ca:Math.round(values.ca*100)/100/1000,
        nc:Math.round(values.nc*100)/100/1000,
        upcross:Math.round(values.upcross*100)/100/1000,
+       sector_id:people.find(p=>p.user_id===uid)?.sector_id||null,
        updated_at:new Date().toISOString(),updated_by:user.id};
      if(original&&['ca','nc','upcross'].every(k=>Math.round(Number(original[k])*100000)===Math.round(Number(change[k])*100000)))continue;
      changes.push(change);
@@ -236,12 +221,11 @@
    if(!changes.length){setMessage('Aucune nouvelle donnée à enregistrer.');return}
    saving=true;const btn=form.querySelector('#rxhSave');btn.disabled=true;btn.textContent='Enregistrement…';
    try{
-     const result=await client.from('sector_monthly_sales').upsert(changes,{onConflict:'fiscal_start_year,sector_id,month_index'});
+     const result=await client.from('seller_monthly_sales').upsert(changes,{onConflict:'fiscal_start_year,user_id,month_index'});
      if(result.error)throw result.error;
-     message=`${changes.length} mois enregistré${changes.length>1?'s':''} pour le secteur ${sec}.`;
+     message=`${changes.length} mois enregistré${changes.length>1?'s':''} pour ${people.find(p=>p.user_id===uid)?.display_name||'le commercial'}.`;
      messageType='ok';lastOutput='';
      form.dataset.dirty='0';
-     window.dispatchEvent(new Event('rex:fiscal-monthly-synced'));
      await load();
    }catch(e){setMessage('Impossible de sauvegarder les chiffres historiques : '+String(e?.message||e),'error')}
    finally{saving=false;btn.disabled=false;btn.textContent='Enregistrer les 12 mois'}
@@ -258,15 +242,15 @@
        client.from('profiles').select('user_id,display_name,role,sector_id').eq('role','seller').order('sector_id'),
        client.from('monthly_forecasts').select('user_id,signature_date,signed_amount_eur,client_type,sale_type')
          .eq('sale_completed',true).gte('signature_date',`${currentYear}-01-01`).lt('signature_date',`${currentYear+1}-01-01`),
-       client.from('sector_monthly_sales').select('fiscal_start_year,month_index,sector_id,ca,nc,upcross')
-         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',currentYear)
+       client.from('seller_monthly_sales').select('fiscal_start_year,month_index,user_id,ca,nc,upcross,sector_id')
+         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',prevYear)
      ]);
      for(const v of [pr,sa,hi])if(v.error)throw v.error;
      if(year!==currentYear){pending=true;return}
      people=pr.data||[];
      sales=sa.data||[];
      rows=hi.data||[];
-     if(!SECTORS.includes(Number(selectedSeller)))selectedSeller='1';
+     if(!people.some(p=>p.user_id===selectedSeller))selectedSeller=people[0]?.user_id||'';
      loaded=true;lastOutput='';if(!message)messageType='ok';draw();
    }catch(e){box.innerHTML=`<div class="rxh-error">Impossible de charger les comparaisons : ${safe(e?.message||e)}</div><button type="button" id="rxhRetry">Réessayer</button>`;box.querySelector('#rxhRetry').onclick=load}
    finally{busy=false;if(pending){pending=false;load()}}
@@ -286,7 +270,6 @@
  }
  window.addEventListener('rex:commercial-data-changed',refresh);
  window.addEventListener('rex:monthly-sale-synced',refresh);
- window.addEventListener('rex:fiscal-monthly-synced',refresh);
  document.addEventListener('click',e=>{if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(refresh,160)});
  window.addEventListener('focus',()=>{if(lastFetch&&Date.now()-lastFetch>60000)refresh()});
  const t=setInterval(()=>{if(start())clearInterval(t)},500);
