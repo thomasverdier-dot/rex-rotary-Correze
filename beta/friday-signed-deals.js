@@ -3,7 +3,8 @@
   const drafts=new Map();
   let monthStatuses=new Map(),monthStatusError='';
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const euro=n=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(Number(n||0)*100000)/100)+' €';
+  const euro=n=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0))+' €';
+  const eurosSigned=row=>row.signed_amount_eur===null||row.signed_amount_eur===undefined?Number(row.amount||0)*1000:Number(row.signed_amount_eur);
   function getSb(){try{return sb}catch(e){return null}}
   function getProfile(){try{return profile||currentProfile||null}catch(e){return null}}
   function getUser(){try{return user||currentUser||null}catch(e){return null}}
@@ -46,7 +47,7 @@
       const q=await client.from('profiles').select('user_id,display_name,sector_id').eq('role','seller').order('sector_id');sellers=q.data||[];
     }else sellers=[{user_id:u.id,display_name:p.display_name||u.email,sector_id:p.sector_id}];
     const ids=sellers.map(s=>s.user_id);if(!ids.length){rows=[];render();return}
-    const q=await client.from('friday_signed_deals').select('id,user_id,week_start,company_name,amount,client_type,sale_type,signature_date,source_kind,monthly_forecast_id,created_at').eq('week_start',week).in('user_id',ids).order('created_at');
+    const q=await client.from('friday_signed_deals').select('id,user_id,week_start,company_name,amount,signed_amount_eur,client_type,sale_type,signature_date,source_kind,monthly_forecast_id,created_at').eq('week_start',week).in('user_id',ids).order('created_at');
     rows=q.data||[];
     monthStatusError='';monthStatuses=new Map();
     try{
@@ -58,11 +59,11 @@
   function canEdit(uid){return isAdmin()||getUser()?.id===uid}
   function blockHtml(s){
     const list=rows.filter(r=>r.user_id===s.user_id);let cl=0,nc=0,total=0;
-    list.forEach(r=>{const a=Number(r.amount||0);total+=a;if(r.client_type==='nouveau')nc+=a;else cl+=a});
+    list.forEach(r=>{const a=Number(eurosSigned(r))/1000;total+=a;if(r.client_type==='nouveau')nc+=a;else cl+=a});
     const editable=canEdit(s.user_id),id=s.user_id.replaceAll('-',''),d=readDraft(s.user_id);
     const form=editable?`<div class="fps-form" id="fpsf_${id}"><div class="fps-field"><label>Entreprise signée</label><input class="fps-company" placeholder="Nom de l'entreprise" value="${esc(d.company)}"></div><div class="fps-field"><label>Montant signé (€)</label><input class="fps-amount" type="number" min="0.01" step="0.01" placeholder="1398.88" value="${esc(d.amount)}"></div><div class="fps-field"><label>Type de client</label><select class="fps-client"><option value="client"${d.clientType==='client'?' selected':''}>Client acquis (CL)</option><option value="nouveau"${d.clientType==='nouveau'?' selected':''}>Nouveau client (NC)</option></select></div><div class="fps-field fps-sale-field"><label>Type de vente</label><select class="fps-sale"><option value="classique"${d.saleType==='classique'?' selected':''}>RNV (renouvellement)</option><option value="up_sell"${['up','cross','up_sell','cross_sell'].includes(d.saleType)?' selected':''}>UC (Up/Cross)</option></select></div><button class="fps-add" data-uid="${s.user_id}">+ Ajouter</button></div>`:'';
-    const table=list.length?`<table class="fps-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Date de signature</th><th>Prévisionnel mois</th>${editable?'<th></th>':''}</tr></thead><tbody>${list.map(r=>`<tr><td><b>${esc(r.company_name)}</b></td><td>${euro(r.amount)}</td><td>${r.client_type==='nouveau'?'NC':'CL'}</td><td>${r.client_type==='nouveau'?'—':['up','cross','up_sell','cross_sell'].includes(r.sale_type)?'UC':'RNV'}</td><td>${r.signature_date?frDate(r.signature_date):'—'}</td><td><label class="fps-month-link" title="${esc(monthStatuses.get(r.id)?.message||monthStatusError)}"><input type="checkbox" class="fps-to-month" data-id="${r.id}" ${r.source_kind==='monthly'||monthStatuses.get(r.id)?.checked?'checked':''} ${(!editable||r.source_kind==='monthly'||monthStatuses.get(r.id)?.locked||monthStatusError)?'disabled':''}> ${r.source_kind==='monthly'?'Depuis le mois':'Intégrer au mois'}</label></td>${editable?`<td>${r.source_kind==='monthly'?'<span class="fps-linked-info">Modifiable dans Prévisionnel mois</span>':`<button class="fps-del" data-id="${r.id}">Supprimer</button>`}</td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="fps-empty">Aucune affaire signée renseignée pour cette semaine.</div>`;
-    return `<div class="fps-box" data-fps="${s.user_id}"><div class="fps-head"><div><h4>✅ Affaires signées cette semaine</h4><div class="fps-date">Semaine du ${frDate(week)}</div></div></div><div class="fps-kpis"><span class="fps-pill">CL <b>${euro(cl)}</b></span><span class="fps-pill">NC <b>${euro(nc)}</b></span><span class="fps-pill">Total signé <b>${euro(total)}</b></span><span class="fps-pill"><b>${list.length}</b> affaire${list.length>1?'s':''}</span></div>${form}${table}<div class="fps-msg">${esc(monthStatusError)}</div></div>`;
+    const table=list.length?`<table class="fps-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Date de signature</th><th>Prévisionnel mois</th>${editable?'<th></th>':''}</tr></thead><tbody>${list.map(r=>`<tr><td><b>${esc(r.company_name)}</b></td><td>${euro(eurosSigned(r))}</td><td>${r.client_type==='nouveau'?'NC':'CL'}</td><td>${r.client_type==='nouveau'?'—':['up','cross','up_sell','cross_sell'].includes(r.sale_type)?'UC':'RNV'}</td><td>${r.signature_date?frDate(r.signature_date):'—'}</td><td><label class="fps-month-link" title="${esc(monthStatuses.get(r.id)?.message||monthStatusError)}"><input type="checkbox" class="fps-to-month" data-id="${r.id}" ${r.source_kind==='monthly'||monthStatuses.get(r.id)?.checked?'checked':''} ${(!editable||r.source_kind==='monthly'||monthStatuses.get(r.id)?.locked||monthStatusError)?'disabled':''}> ${r.source_kind==='monthly'?'Depuis le mois':'Intégrer au mois'}</label></td>${editable?`<td>${r.source_kind==='monthly'?'<span class="fps-linked-info">Modifiable dans Prévisionnel mois</span>':`<button class="fps-del" data-id="${r.id}">Supprimer</button>`}</td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="fps-empty">Aucune affaire signée renseignée pour cette semaine.</div>`;
+    return `<div class="fps-box" data-fps="${s.user_id}"><div class="fps-head"><div><h4>✅ Affaires signées cette semaine</h4><div class="fps-date">Semaine du ${frDate(week)}</div></div></div><div class="fps-kpis"><span class="fps-pill">CL <b>${euro(cl*1000)}</b></span><span class="fps-pill">NC <b>${euro(nc*1000)}</b></span><span class="fps-pill">Total signé <b>${euro(total*1000)}</b></span><span class="fps-pill"><b>${list.length}</b> affaire${list.length>1?'s':''}</span></div>${form}${table}<div class="fps-msg">${esc(monthStatusError)}</div></div>`;
   }
   function render(){
     saveAllDrafts();addStyle();const cards=[...document.querySelectorAll('#fpCards .fp-seller')];if(!cards.length)return;
@@ -100,9 +101,9 @@
   }
   async function addDeal(uid){
     const box=document.getElementById('fpsf_'+uid.replaceAll('-','')),client=getSb();if(!box||!client)return;
-    const company=box.querySelector('.fps-company')?.value.trim()||'',enteredEuros=Number(box.querySelector('.fps-amount')?.value||0),amount=Math.round(enteredEuros*100)/100000,clientType=box.querySelector('.fps-client')?.value||'client',saleType=clientType==='nouveau'?'classique':box.querySelector('.fps-sale')?.value||'classique';
+    const company=box.querySelector('.fps-company')?.value.trim()||'',enteredEuros=Number(box.querySelector('.fps-amount')?.value||0),signedAmountEuros=Math.round(enteredEuros*100)/100,clientType=box.querySelector('.fps-client')?.value||'client',saleType=clientType==='nouveau'?'classique':box.querySelector('.fps-sale')?.value||'classique';
     if(!company){alert("Renseigne le nom de l'entreprise signée.");return}if(!Number.isFinite(enteredEuros)||enteredEuros<=0||Math.abs(enteredEuros*100-Math.round(enteredEuros*100))>0.00001){alert('Renseigne un montant en euros, au centime près.');return}
-    const r=await client.from('friday_signed_deals').insert({user_id:uid,week_start:week,company_name:company,amount,client_type:clientType,sale_type:saleType,updated_at:new Date().toISOString()}).select().single();
+    const r=await client.from('friday_signed_deals').insert({user_id:uid,week_start:week,company_name:company,signed_amount_eur:signedAmountEuros,client_type:clientType,sale_type:saleType,updated_at:new Date().toISOString()}).select().single();
     if(r.error){alert(r.error.message);return}rows.push(r.data);drafts.delete(draftKey(uid));render();
   }
   async function deleteDeal(id){

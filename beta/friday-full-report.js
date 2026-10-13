@@ -14,7 +14,8 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const n=v=>Number(v||0);
   const euro=v=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(n(v))+' k€';
-  const signedEuro=v=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(n(v)*100000)/100)+' €';
+  const signedEuro=v=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n(v))+' €';
+  const euroAmount=row=>Number(row.signed_amount_eur??(n(row.amount)*1000));
   const pct=(v,t)=>n(t)?Math.round(n(v)/n(t)*100):(n(v)>0?100:0);
   function addDays(iso,days){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
   function frDate(iso){return iso?new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}):''}
@@ -73,7 +74,7 @@
         client.from('seller_activity_targets').select('*').eq('user_id',uid).maybeSingle(),
         client.from('friday_activity').select('*').eq('user_id',uid).eq('week_start',week).maybeSingle(),
         client.from('friday_activity').select('agreed_actions').eq('user_id',uid).eq('week_start',prev).maybeSingle(),
-        client.from('friday_signed_deals').select('company_name,amount,client_type,sale_type,created_at').eq('user_id',uid).eq('week_start',week).order('created_at'),
+        client.from('friday_signed_deals').select('company_name,amount,signed_amount_eur,client_type,sale_type,created_at').eq('user_id',uid).eq('week_start',week).order('created_at'),
         client.from('weekly_forecasts').select('company_name,amount,client_type,sale_type,probability,negotiation_meeting_scheduled,created_at').eq('user_id',uid).eq('week_start',next).order('created_at')
       ]);
       const errors=[pr,tg,ac,pv,sg,nf].map(x=>x.error).filter(Boolean);if(errors.length)throw errors[0];
@@ -84,12 +85,12 @@
       if(previousAction&&a.previous_action_status==='not_done'&&!String(a.previous_action_comment||'').trim())missing.push('explication de l’action non faite');
       if(!String(a.agreed_actions||'').trim())missing.push('nouvelle action à mener');
 
-      let signedCL=0,signedNC=0,signedTotal=0;signed.forEach(r=>{const x=n(r.amount);signedTotal+=x;if(r.client_type==='nouveau')signedNC+=x;else signedCL+=x});
+      let signedCL=0,signedNC=0,signedTotal=0; signed.forEach(r=>{const x=euroAmount(r);signedTotal+=x;if(r.client_type==='nouveau')signedNC+=x;else signedCL+=x});
       let nextCL=0,nextNC=0,nextTotal=0;forecast.forEach(r=>{const x=n(r.amount);nextTotal+=x;if(r.client_type==='nouveau')nextNC+=x;else nextCL+=x});
       const metricLines=METRICS.map(([ak,tk,label])=>{const p=pct(a[ak],target[tk]);const state=p>=100?'Atteint':p>=80?'À surveiller':'À travailler';return `- ${label} : ${n(a[ak])} / objectif ${n(target[tk])} — ${p}% — ${state}`});
       const monthPct=pct(a.deals_created_month,target.deals_created_month);
       const goods=[],lows=[];METRICS.forEach(([ak,tk,label])=>{const p=pct(a[ak],target[tk]);if(p>=100)goods.push(label);else if(p<80)lows.push(label)});
-      const signedLines=signed.length?signed.map(r=>`- ${r.company_name||'Entreprise'} — ${signedEuro(r.amount)} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')}`):['- Aucune affaire signée renseignée.'];
+      const signedLines=signed.length?signed.map(r=>`- ${r.company_name||'Entreprise'} — ${signedEuro(euroAmount(r))} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')}`):['- Aucune affaire signée renseignée.'];
       const forecastLines=forecast.length?forecast.map(r=>`- ${r.company_name||'Entreprise'} — ${euro(r.amount)} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')} — probabilité ${n(r.probability)}% — RDV négo : ${r.negotiation_meeting_scheduled?'Oui':'Non'}`):['- Aucune affaire renseignée pour la semaine prochaine.'];
       const automatic=[];if(goods.length)automatic.push(`Points atteints : ${goods.join(', ')}.`);if(lows.length)automatic.push(`Points à travailler : ${lows.join(', ')}.`);if(!goods.length&&!lows.length)automatic.push('Activité globalement proche des objectifs.');
       const text=[
