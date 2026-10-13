@@ -14,6 +14,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const n=v=>Number(v||0);
   const euro=v=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(n(v))+' k€';
+  const signedEuro=v=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(n(v)*100000)/100)+' €';
   const pct=(v,t)=>n(t)?Math.round(n(v)/n(t)*100):(n(v)>0?100:0);
   function addDays(iso,days){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
   function frDate(iso){return iso?new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}):''}
@@ -88,7 +89,7 @@
       const metricLines=METRICS.map(([ak,tk,label])=>{const p=pct(a[ak],target[tk]);const state=p>=100?'Atteint':p>=80?'À surveiller':'À travailler';return `- ${label} : ${n(a[ak])} / objectif ${n(target[tk])} — ${p}% — ${state}`});
       const monthPct=pct(a.deals_created_month,target.deals_created_month);
       const goods=[],lows=[];METRICS.forEach(([ak,tk,label])=>{const p=pct(a[ak],target[tk]);if(p>=100)goods.push(label);else if(p<80)lows.push(label)});
-      const signedLines=signed.length?signed.map(r=>`- ${r.company_name||'Entreprise'} — ${euro(r.amount)} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')}`):['- Aucune affaire signée renseignée.'];
+      const signedLines=signed.length?signed.map(r=>`- ${r.company_name||'Entreprise'} — ${signedEuro(r.amount)} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')}`):['- Aucune affaire signée renseignée.'];
       const forecastLines=forecast.length?forecast.map(r=>`- ${r.company_name||'Entreprise'} — ${euro(r.amount)} — ${r.client_type==='nouveau'?'NC':'CL'} — ${cap(r.sale_type||'classique')} — probabilité ${n(r.probability)}% — RDV négo : ${r.negotiation_meeting_scheduled?'Oui':'Non'}`):['- Aucune affaire renseignée pour la semaine prochaine.'];
       const automatic=[];if(goods.length)automatic.push(`Points atteints : ${goods.join(', ')}.`);if(lows.length)automatic.push(`Points à travailler : ${lows.join(', ')}.`);if(!goods.length&&!lows.length)automatic.push('Activité globalement proche des objectifs.');
       const text=[
@@ -108,7 +109,7 @@
         `- KM : ${yes(!!a.km_up_to_date)}`,
         '',
         '3. AFFAIRES SIGNÉES CETTE SEMAINE',
-        `Total signé : ${euro(signedTotal)} — CL : ${euro(signedCL)} — NC : ${euro(signedNC)} — ${signed.length} affaire${signed.length>1?'s':''}`,
+        `Total signé : ${signedEuro(signedTotal)} — CL : ${signedEuro(signedCL)} — NC : ${signedEuro(signedNC)} — ${signed.length} affaire${signed.length>1?'s':''}`,
         ...signedLines,
         '',
         '4. ACTION DU POINT PRÉCÉDENT',
