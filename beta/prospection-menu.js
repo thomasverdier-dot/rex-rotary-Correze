@@ -1,4 +1,4 @@
-/* Menu Prospection de la version beta : regroupe les deux modules existants sans changer leurs pages. */
+/* Menu Prospection de la version beta : rassemble Carte, prospection physique et téléphonique sans modifier leurs pages. */
 (()=>{
   const NAV='#rexShellV3 .rex-nav';
   const ID='rexProspectionMenu';
@@ -25,9 +25,10 @@
     const nav=document.querySelector(NAV);
     if(!nav)return false;
     if(document.getElementById(ID))return true;
+    const map=nav.querySelector('button[data-page="map"]');
     const physical=nav.querySelector('#physicalProspectionNav');
     const phone=nav.querySelector('button[data-page="phoning"]');
-    if(!physical||!phone||physical.parentElement!==nav||phone.parentElement!==nav)return false;
+    if(!map||!physical||!phone||map.parentElement!==nav||physical.parentElement!==nav||phone.parentElement!==nav)return false;
 
     addStyle();
     const group=document.createElement('div');
@@ -46,7 +47,8 @@
     nav.insertBefore(group,physical);
 
     // Les vrais boutons et leurs événements sont conservés : aucune modification du métier.
-    submenu.append(physical,phone);
+    submenu.append(map,physical,phone);
+    map.textContent='🗺️ Carte';
     physical.textContent='🚶 Prospection physique';
     phone.textContent='☎ Prospection téléphonique';
 
@@ -55,7 +57,7 @@
       toggle.setAttribute('aria-expanded',String(open));
     }
     function sync(){
-      const selected=physical.classList.contains('active')||phone.classList.contains('active');
+      const selected=map.classList.contains('active')||physical.classList.contains('active')||phone.classList.contains('active');
       group.classList.toggle('current',selected);
     }
     toggle.addEventListener('click',()=>setOpen(!group.classList.contains('open')));
@@ -67,6 +69,7 @@
       if(event.key==='Escape'){setOpen(false);toggle.focus();}
     });
     const watcher=new MutationObserver(sync);
+    watcher.observe(map,{attributes:true,attributeFilter:['class']});
     watcher.observe(physical,{attributes:true,attributeFilter:['class']});
     watcher.observe(phone,{attributes:true,attributeFilter:['class']});
     sync();
