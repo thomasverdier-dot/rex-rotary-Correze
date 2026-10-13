@@ -29,6 +29,8 @@
         background:#f8fafc;
         align-items:end;
       }
+      body.seller #weeklyForecast .wf-form.wf-wide-form.wf-nouveau{grid-template-areas:"company company amount probability" "client client rdv add"}
+      body.seller #weeklyForecast .wf-form.wf-nouveau .wf-wide-sale{display:none!important}
       body.seller #weeklyForecast .wf-wide-field{display:flex;flex-direction:column;gap:6px;min-width:0}
       body.seller #weeklyForecast .wf-wide-label{font-size:11px;font-weight:800;color:#475569;line-height:1.2}
       body.seller #weeklyForecast .wf-wide-field input,
