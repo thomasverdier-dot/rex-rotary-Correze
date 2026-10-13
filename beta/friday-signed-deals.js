@@ -54,7 +54,7 @@
     list.forEach(r=>{const a=Number(r.amount||0);total+=a;if(r.client_type==='nouveau')nc+=a;else cl+=a});
     const editable=canEdit(s.user_id),id=s.user_id.replaceAll('-',''),d=readDraft(s.user_id);
     const form=editable?`<div class="fps-form" id="fpsf_${id}"><div class="fps-field"><label>Entreprise signée</label><input class="fps-company" placeholder="Nom de l'entreprise" value="${esc(d.company)}"></div><div class="fps-field"><label>Montant (k€)</label><input class="fps-amount" type="number" min="0" step="0.1" placeholder="0" value="${esc(d.amount)}"></div><div class="fps-field"><label>Client</label><select class="fps-client"><option value="client"${d.clientType==='client'?' selected':''}>CL</option><option value="nouveau"${d.clientType==='nouveau'?' selected':''}>NC</option></select></div><div class="fps-field"><label>Type de vente</label><select class="fps-sale"><option value="classique"${d.saleType==='classique'?' selected':''}>Classique</option><option value="up"${d.saleType==='up'?' selected':''}>Up</option><option value="cross"${d.saleType==='cross'?' selected':''}>Cross</option></select></div><button class="fps-add" data-uid="${s.user_id}">+ Ajouter</button></div>`:'';
-    const table=list.length?`<table class="fps-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th>${editable?'<th></th>':''}</tr></thead><tbody>${list.map(r=>`<tr><td><b>${esc(r.company_name)}</b></td><td>${euro(r.amount)}</td><td>${r.client_type==='nouveau'?'NC':'CL'}</td><td>${esc((r.sale_type||'classique').replace(/^./,m=>m.toUpperCase()))}</td>${editable?`<td><button class="fps-del" data-id="${r.id}">Supprimer</button></td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="fps-empty">Aucune affaire signée renseignée pour cette semaine.</div>`;
+    const table=list.length?`<table class="fps-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th>${editable?'<th></th>':''}</tr></thead><tbody>${list.map(r=>`<tr><td><b>${esc(r.company_name)}</b></td><td>${euro(r.amount)}</td><td>${r.client_type==='nouveau'?'NC':'CL'}</td><td>${esc((r.sale_type||'classique').replace(/^./,m=>m.toUpperCase()))}</td>${editable?`<td><button class="fps-to-month" data-id="${r.id}">Ajouter au mois</button> <button class="fps-del" data-id="${r.id}">Supprimer</button></td>`:''}</tr>`).join('')}</tbody></table>`:`<div class="fps-empty">Aucune affaire signée renseignée pour cette semaine.</div>`;
     return `<div class="fps-box" data-fps="${s.user_id}"><div class="fps-head"><div><h4>✅ Affaires signées cette semaine</h4><div class="fps-date">Semaine du ${frDate(week)}</div></div></div><div class="fps-kpis"><span class="fps-pill">CL <b>${euro(cl)}</b></span><span class="fps-pill">NC <b>${euro(nc)}</b></span><span class="fps-pill">Total signé <b>${euro(total)}</b></span><span class="fps-pill"><b>${list.length}</b> affaire${list.length>1?'s':''}</span></div>${form}${table}<div class="fps-msg"></div></div>`;
   }
   function render(){
@@ -67,10 +67,21 @@
     });
     document.querySelectorAll('.fps-add').forEach(b=>b.onclick=()=>addDeal(b.dataset.uid));
     document.querySelectorAll('.fps-del').forEach(b=>b.onclick=()=>deleteDeal(b.dataset.id));
+    document.querySelectorAll('.fps-to-month').forEach(b=>b.onclick=()=>promoteSigned(b.dataset.id,b));
     document.querySelectorAll('.fps-form').forEach(box=>{
       const uid=box.querySelector('.fps-add[data-uid]')?.dataset.uid;if(!uid)return;
       box.querySelectorAll('input,select').forEach(el=>{el.addEventListener('input',()=>saveDraft(uid,box));el.addEventListener('change',()=>saveDraft(uid,box))});
     });
+  }
+  async function promoteSigned(recordId,btn){
+    const row=rows.find(x=>x.id===recordId);if(!row||!canEdit(row.user_id)||!window.rexPromoteToMonth)return;
+    btn.disabled=true;
+    try{
+      const r=await window.rexPromoteToMonth(row,row.week_start,'signed');
+      const card=btn.closest('.fps-box'),msg=card?.querySelector('.fps-msg');if(msg)msg.textContent=r.message;
+      if(r.ok||r.already){btn.textContent='Déjà au mois';btn.disabled=true}
+      else btn.disabled=false;
+    }catch(e){const msg=btn.closest('.fps-box')?.querySelector('.fps-msg');if(msg)msg.textContent=String(e?.message||e);btn.disabled=false}
   }
   async function addDeal(uid){
     const box=document.getElementById('fpsf_'+uid.replaceAll('-','')),client=getSb();if(!box||!client)return;
