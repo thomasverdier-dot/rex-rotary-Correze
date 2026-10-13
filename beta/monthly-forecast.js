@@ -2,7 +2,7 @@
   const euro=n=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:1}).format(Number(n||0))+' k€';
   // La base conserve les k€ pour le calcul global ; les montants signés sont saisis en €.
   const signedEuros=n=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(Number(n||0)*100000)/100)+' €';
-  const signedInput=n=>(Math.round(Number(n||0)*100000)/100).toFixed(2);
+  const signedInput=d=>Number(d.signed_amount_eur??(Number(d.amount||0)*1000)).toFixed(2);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const monthValue=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
   const monthStart=v=>`${v}-01`;
@@ -83,7 +83,7 @@
 
   function card(s){
     const list=deals.filter(d=>d.user_id===s.user_id),t=sums(list),id='mmf'+String(s.user_id).replaceAll('-','');
-    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="${d.sale_completed?'0.01':'0.1'}" step="${d.sale_completed?'0.01':'0.1'}" value="${d.sale_completed?signedInput(d.amount):Number(d.amount||0)}" data-id="${d.id}" aria-label="Montant en ${d.sale_completed?'euros':'k€'} pour ${esc(d.company_name||'Entreprise')}"><span class="mm-amount-unit">${d.sale_completed?'€':'k€'}</span><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer le montant">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td><input class="mm-date-signature" type="date" data-id="${d.id}" value="${esc(d.signature_date||'')}" aria-label="Date de signature de ${esc(d.company_name)}"><span class="mm-date-help">${d.sale_completed&&!d.signature_date?'Date requise pour intégrer aux signatures':''}</span></td><td><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
+    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="${d.sale_completed?'0.01':'0.1'}" step="${d.sale_completed?'0.01':'0.1'}" value="${d.sale_completed?signedInput(d):Number(d.amount||0)}" data-id="${d.id}" aria-label="Montant en ${d.sale_completed?'euros':'k€'} pour ${esc(d.company_name||'Entreprise')}"><span class="mm-amount-unit">${d.sale_completed?'€':'k€'}</span><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer le montant">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td><input class="mm-date-signature" type="date" data-id="${d.id}" value="${esc(d.signature_date||'')}" aria-label="Date de signature de ${esc(d.company_name)}"><span class="mm-date-help">${d.sale_completed&&!d.signature_date?'Date requise pour intégrer aux signatures':''}</span></td><td><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
     return `<div class="mm-card"><div class="mm-title"><h3>${esc(s.display_name||'Vendeur')}</h3><span>Secteur ${esc(s.sector_id||'—')}</span></div><div class="mm-wrap"><table class="mm-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Chance</th><th>RDV négo</th><th>Date de signature</th><th>Signature</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="mm-form" id="${id}"><div class="mm-form-grid"><div class="mm-field"><label>Entreprise</label><input class="company" placeholder="Nom de l’entreprise"></div><div class="mm-field"><label>Montant (k€)</label><input class="amount" type="number" min="0" step="0.1" placeholder="Ex. 12,5"></div><div class="mm-field"><label>Type de client</label><select class="client"><option value="acquis">Client acquis (CL)</option><option value="nouveau">Nouveau client (NC)</option></select></div><div class="mm-field mm-sale-field"><label>Type de vente</label><select class="sale"><option value="classique">RNV (renouvellement)</option><option value="up_sell">UC (Up/Cross)</option></select></div></div><div class="mm-form-row2"><div class="mm-field"><label>Probabilité (%)</label><input class="prob" type="number" min="0" max="100" value="50"></div><label class="mm-check"><input class="rdv" type="checkbox"> RDV négociation prévu</label><button class="mm-add" data-uid="${s.user_id}">Ajouter au mois</button></div></div><div class="mm-totals"><span class="mm-pill">CL : <b>${euro(t.cl)}</b></span><span class="mm-pill">NC : <b>${euro(t.nc)}</b></span><span class="mm-pill">Up/Cross : <b>${euro(t.upcross)}</b></span><span class="mm-pill">Total : <b>${euro(t.total)}</b></span></div></div>`;
   }
 
@@ -110,12 +110,13 @@
     if(isSigned&&Math.abs(entered*100-Math.round(entered*100))>0.00001){
       alert('Pour une vente réalisée, le montant doit être au centime près.');input.focus();return
     }
-    const amount=isSigned?Math.round(entered*100)/100000:Number(entered);
+    const values=isSigned?{signed_amount_eur:Math.round(entered*100)/100}:{amount:entered};
     button.disabled=true;input.disabled=true;
-    const result=await client.from('monthly_forecasts').update({amount,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start).select('id,amount').maybeSingle();
+    const result=await client.from('monthly_forecasts').update({...values,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start).select('id,amount,signed_amount_eur').maybeSingle();
     button.disabled=false;input.disabled=false;
     if(result.error||!result.data){alert('Impossible d’enregistrer le montant : '+(result.error?.message||'Aucune ligne modifiée.'));return}
     deal.amount=Number(result.data.amount);
+    deal.signed_amount_eur=result.data.signed_amount_eur===null?null:Number(result.data.signed_amount_eur);
     window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     render();
   }
@@ -135,7 +136,7 @@
     const result=await client.from('monthly_forecasts')
       .update({...changes,updated_at:new Date().toISOString()})
       .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start)
-      .select('id,sale_completed,signature_date').maybeSingle();
+      .select('id,sale_completed,signature_date,amount,signed_amount_eur').maybeSingle();
     if(result.error||!result.data)return {ok:false,message:result.error?.message||'Enregistrement non confirmé.'};
     Object.assign(deal,result.data);
     window.dispatchEvent(new Event('rex:monthly-sale-synced'));
@@ -155,8 +156,30 @@
     if(!checked&&deal.sale_completed&&!confirm('Annuler la validation de cette vente ? La signature créée automatiquement depuis le mois sera retirée du Point du vendredi.')){
       checkbox.checked=true;return;
     }
+    let signedEuro=null;
+    if(checked){
+      const defaultEuro=signedInput(deal);
+      const raw=prompt('Montant réellement signé pour « '+deal.company_name+' » EN EUROS (€), centimes inclus :',defaultEuro);
+      if(raw===null){checkbox.checked=false;return}
+      const normalized=raw.trim().replace(/\s/g,'').replace(',','.');
+      signedEuro=Number(normalized);
+      if(!normalized||!Number.isFinite(signedEuro)||signedEuro<=0||
+         Math.abs(signedEuro*100-Math.round(signedEuro*100))>0.00001){
+        checkbox.checked=false;
+        alert('Montant invalide : saisis des euros et centimes, par exemple 1398,88.');
+        return;
+      }
+      signedEuro=Math.round(signedEuro*100)/100;
+      if(signedEuro>100000&&!confirm('Confirmer le montant signé de '+signedEuro.toLocaleString('fr-FR',{style:'currency',currency:'EUR'})+' ?')){
+        checkbox.checked=false;return;
+      }
+    }
     checkbox.disabled=true;if(input)input.disabled=true;
-    const result=await saveSignature(id,{sale_completed:checked,signature_date:checked?date:null});
+    const result=await saveSignature(id,{
+      sale_completed:checked,
+      signature_date:checked?date:null,
+      signed_amount_eur:checked?signedEuro:null
+    });
     if(!result.ok){checkbox.checked=!!deal.sale_completed;alert('Impossible de valider la vente : '+result.message)}
     checkbox.disabled=false;if(input)input.disabled=false;
   }
