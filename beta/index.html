@@ -67,11 +67,11 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_20');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_21');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=5'),
-      local('beta/monthly-forecast.js?v=12'),
+      local('beta/monthly-forecast.js?v=13'),
 
       local('ui-v3.js?v=3'),
       local('beta/admin-seller-management.js?v=1'),
@@ -79,8 +79,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/admin-weekly-tasks.js?v=1'),
       local('beta/seller-dashboard-tasks.js?v=3'),
       local('beta/dashboard-sales-kpis.js?v=1'),
-      local('beta/dashboard-live-sales.js?v=1'),
-      local('beta/friday-crm-report-dashboard.js?v=2'),
+      local('beta/dashboard-live-sales.js?v=2'),
+      local('beta/friday-crm-report-dashboard.js?v=3'),
       local('beta/forecast-tabs.js?v=2'),
       local('beta/forecast-form-wide.js?v=2'),
       local('beta/fiscal-sales-tracking.js?v=1'),
@@ -114,7 +114,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-accordion.js?v=1'),
       local('beta/friday-readability.js?v=3'),
       local('beta/friday-seller-comment.js?v=1'),
-      local('beta/friday-splus1-editor.js?v=4')
+      local('beta/friday-splus1-editor.js?v=5')
     ];
     for(const src of modules)await addScript(doc,src);
     // Charger la présentation épurée dans l'iframe avant de l'afficher.
