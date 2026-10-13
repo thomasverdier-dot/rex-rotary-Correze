@@ -4,7 +4,7 @@
   const numeric=x=>{const n=Number(x);return Number.isFinite(n)?n:0};
   const centsEUR=x=>Math.round(numeric(x)*100);
   const centsK=x=>Math.round(numeric(x)*100000);
-  const signedCents=x=>x.signed_amount_eur==null?centsK(x.amount):centsEUR(x.signed_amount_eur);
+  const signedCents=x=>centsEUR(x.signed_amount_eur); // Toujours l'euro exact, jamais l'ancienne prévision en k€.
   const euro=x=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x/100)+' €';
   const plain=x=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false}).format(x/100);
   const dateText=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
@@ -16,7 +16,7 @@
   const pf=()=>{try{return profile||currentProfile}catch(e){return null}};
   const auth=()=>{try{return user||currentUser}catch(e){return null}};
   const home=()=>document.querySelector('.rex-page[data-page="dashboard"]');
-  let mondaySelected=monday(new Date()),busy=false,pending=false,lastLoad=0;
+  let mondaySelected=monday(new Date()),busy=false,pending=false,lastLoad=0,lastAttempt=0,lastSignature='',refreshTimer=null,started=false;
   const totals=(sales,forecast)=>({
     ca:sales.reduce((v,x)=>v+signedCents(x),0),
     nc:sales.reduce((v,x)=>v+(x.client_type==='nouveau'?signedCents(x):0),0),
@@ -76,6 +76,13 @@
   }
   function display(sales,forecast,people){
     const el=mount();if(!el)return;
+    const fingerprint=JSON.stringify([mondaySelected,
+      ...[sales,forecast,people].map(xs=>xs.map(x=>JSON.stringify(Object.keys(x).sort().map(k=>[k,x[k]]))).sort())]);
+    if(lastSignature===fingerprint&&el.querySelector('#fwrStatus')){
+      lastLoad=Date.now();
+      el.querySelector('#fwrStatus').textContent='Chiffres vérifiés à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' · À jour';
+      return;
+    }
     const isManager=pf()?.role==='admin';
     const sums=totals(sales,forecast),end=shift(mondaySelected,4),next=shift(mondaySelected,7),nextEnd=shift(mondaySelected,11);
     const detail=people.map(p=>{
@@ -115,6 +122,7 @@ Dont NC réalisé : ${plain(sums.nc)} €
 Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €`
     };
     el.querySelectorAll('[data-fwr-copy]').forEach(b=>b.onclick=()=>copy(clipboard[b.dataset.fwrCopy]));
+    lastSignature=fingerprint;
     lastLoad=Date.now();
   }
   async function copy(text){
@@ -132,7 +140,7 @@ Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €
     const el=mount(),client=supa(),p=pf(),u=auth();
     if(!el||!client||!p||!u)return;
     if(busy){pending=true;return}
-    busy=true;const selected=mondaySelected;
+    busy=true;lastAttempt=Date.now();const selected=mondaySelected;
     try{
       let people=[];
       if(p.role==='admin'){
@@ -151,6 +159,7 @@ Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €
       if(selected!==mondaySelected){pending=true;return}
       display(sr.data||[],fr.data||[],people);
     }catch(e){
+      lastSignature='';
       el.innerHTML=`<div class="fwr-error">Impossible de charger les trois chiffres : ${esc(e?.message||e)}</div><button id="fwrRetry">Réessayer</button>`;
       el.querySelector('#fwrRetry').onclick=()=>load();
     }finally{
@@ -158,14 +167,19 @@ Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €
       if(pending){pending=false;load()}
     }
   }
-  function boot(){if(mount()&&supa()&&pf()&&auth()){load();return true}return false}
+  function boot(){if(mount()&&supa()&&pf()&&auth()){if(!started){started=true;load()}return true}return false}
+  function requestRefresh(){
+    if(!home()?.classList.contains('active'))return;
+    if(refreshTimer!==null)clearTimeout(refreshTimer);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;load()},550);
+  }
   document.addEventListener('click',e=>{
-    if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(()=>load(),160);
+    if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(requestRefresh,160);
   });
-  window.addEventListener('rex:monthly-sale-synced',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
-  window.addEventListener('rex:weekly-forecast-synced',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
-  window.addEventListener('rex:commercial-data-changed',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
+  window.addEventListener('rex:monthly-sale-synced',()=>{requestRefresh()});
+  window.addEventListener('rex:weekly-forecast-synced',()=>{requestRefresh()});
+  window.addEventListener('rex:commercial-data-changed',()=>{requestRefresh()});
   let n=0;const t=setInterval(()=>{n++;if(boot()||n>160)clearInterval(t)},400);
-  setInterval(()=>{if(home()?.classList.contains('active')&&lastLoad&&Date.now()-lastLoad>60000)load()},10000);
+  setInterval(()=>{if(home()?.classList.contains('active')&&lastAttempt&&Date.now()-lastAttempt>60000)requestRefresh()},10000);
   window.addEventListener('load',()=>setTimeout(boot,900));
 })();
