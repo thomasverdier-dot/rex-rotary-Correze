@@ -67,7 +67,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>new URL(p,root).href;
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_2');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=4'),
@@ -109,7 +109,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-nav-guard.js?v=1'),
       local('beta/prospection-menu.js?v=1'),
       local('beta/friday-seller-accordion.js?v=1'),
-      local('beta/friday-readability.js?v=2'),
+      local('beta/friday-readability.js?v=3'),
       local('beta/friday-seller-comment.js?v=1'),
       local('beta/friday-splus1-editor.js?v=1')
     ];
