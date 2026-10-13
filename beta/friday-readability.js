@@ -30,7 +30,6 @@
    #rexFridayPage .fp-tabs button.active{background:#fff;color:#10233f;box-shadow:0 2px 9px rgba(0,0,0,.09)}
    #rexFridayPage .fp-body[data-fp-view="activity"]>[data-fp-panel]:not([data-fp-panel="activity"]),
    #rexFridayPage .fp-body[data-fp-view="sales"]>[data-fp-panel]:not([data-fp-panel="sales"]),
-   #rexFridayPage .fp-body[data-fp-view="actions"]>[data-fp-panel]:not([data-fp-panel="actions"]),
    #rexFridayPage .fp-body[data-fp-view="report"]>[data-fp-panel]:not([data-fp-panel="report"]),
    #rexFridayPage .fp-body[data-fp-view="forecast"]>[data-fp-panel]:not([data-fp-panel="forecast"]),
    #rexFridayPage .fp-body[data-fp-view="comment"]>[data-fp-panel]:not([data-fp-panel="comment"]){display:none!important}
@@ -62,7 +61,7 @@
    if(node.matches('.fps-box'))return 'sales';
    if(node.matches('.fp-nextweek,.fp-forecast,.fp-nextweek-editor'))return 'forecast';
    if(node.matches('.fp-week-comment'))return 'comment';
-   if(node.matches('.fpa-box,.fpc-box'))return 'actions';
+   if(node.matches('.fpa-box,.fpc-box'))return 'report';
    if(node.matches('.fp-manager,.fpr-box,.fp-summary-box'))return 'report';
    return null;
  }
@@ -87,7 +86,7 @@
    let tabs=body.querySelector(':scope > .fp-tabs');
    if(!tabs){
     tabs=document.createElement('div');tabs.className='fp-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Rubriques du Point vendredi');
-    for(const [k,label] of [['activity','Activité'],['sales','Ventes réalisées'],['actions','Actions'],['forecast','Prév. S+1'],['comment','Commentaire'],['report','Compte rendu']]){
+    for(const [k,label] of [['activity','Activité'],['sales','Ventes réalisées'],['forecast','Prév. S+1'],['comment','Commentaire'],['report','Compte rendu']]){
       const btn=document.createElement('button');btn.type='button';btn.dataset.view=k;btn.textContent=label;btn.setAttribute('role','tab');
       btn.addEventListener('click',()=>{state.tab.set(id,k);configure(card,i)});
       tabs.append(btn);
@@ -95,6 +94,12 @@
     body.prepend(tabs);
    }
    const manager=body.querySelector(':scope > .fp-manager');
+   const checklist=body.querySelector(':scope > .fpc-box');
+   const actions=body.querySelector(':scope > .fpa-box');
+   if(manager){
+     if(actions&&actions.nextElementSibling!==manager)body.insertBefore(actions,manager);
+     if(checklist&&checklist.nextElementSibling!==actions&&checklist.nextElementSibling!==manager)body.insertBefore(checklist,actions||manager);
+   }
    const report=body.querySelector(':scope > .fpr-box');
    if(manager){
      const heading=manager.querySelector(':scope > b');
