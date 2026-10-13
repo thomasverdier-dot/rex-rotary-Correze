@@ -17,7 +17,7 @@
   const authUser=()=>{try{return user||currentUser||null}catch(e){return null}};
   const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
   const now=new Date();
-  let month=monthISO(now),week=mon(iso(now)),loading=false,again=false,lastRun=0,channel=null,subscribedFor='',showSellers=false;
+  let month=monthISO(now),week=mon(iso(now)),loading=false,again=false,lastRun=0,lastAttempt=0,channel=null,subscribedFor='',showSellers=false,started=false,refreshTimer=null,refreshAfterInput=false,lastRenderSignature='';
 
   function monthRange(m){
     const first=m+'-01',date=fromISO(first),end=new Date(date.getFullYear(),date.getMonth()+1,1,12),last=new Date(end);
@@ -87,8 +87,19 @@
     else if(!annual&&head && head.nextElementSibling!==node)head.insertAdjacentElement('afterend',node);
     return node;
   }
+  // Ne pas détruire les panneaux et sélections du tableau de bord si les données sont inchangées.
+  function fingerprint(data){
+    const records=xs=>xs.map(x=>JSON.stringify(Object.keys(x).sort().map(k=>[k,x[k]]))).sort();
+    return JSON.stringify([month,week,records(data.people),records(data.months),records(data.actuals),records(data.previsions)]);
+  }
   function show(data){
     const el=mount();if(!el)return;
+    const fingerprintNow=fingerprint(data);
+    if(lastRenderSignature===fingerprintNow&&el.querySelector('#lspUpdated')){
+      lastRun=Date.now();
+      el.querySelector('#lspUpdated').textContent='Chiffres vérifiés à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · À jour';
+      return;
+    }
     const {people,months,actuals,previsions}=data;
     const range=monthRange(month),currentWeek=week,weekEnd=advance(week,4),nextWeek=advance(week,7);
     const inMonth=actuals.filter(x=>x.signature_date>=range.first&&x.signature_date<range.next);
@@ -121,7 +132,7 @@
       <div class="lsp-month">
         <div class="lsp-number"><span>CA réalisé</span><b class="lsp-real">${fmtEUR(monthTotals.actual)}</b></div>
         <div class="lsp-number"><span>Dont nouveaux clients (NC)</span><b>${fmtEUR(monthTotals.nc)}</b></div>
-        <div class="lsp-number"><span>Prévision initiale du mois</span><b>${fmtEUR(monthTotals.predicted)}</b></div>
+        <div class="lsp-number"><span>Prévision du mois (actualisée)</span><b>${fmtEUR(monthTotals.predicted)}</b></div>
         <div class="lsp-number"><span>Écart prévision − réalisé</span><b>${fmtEUR(delta)}</b></div>
       </div>
       <div class="lsp-section">Semaine du ${dateLabel(week)} au ${dateLabel(weekEnd)}</div>
@@ -150,13 +161,14 @@
     el.querySelector('#lspRefresh').onclick=load;
     const details=el.querySelector('#lspSellers');
     if(details)details.addEventListener('toggle',()=>{showSellers=details.open});
+    lastRenderSignature=fingerprintNow;
     lastRun=Date.now();
   }
   async function load(){
     const el=mount(),client=sbClient(),p=profileData(),u=authUser();
     if(!el||!client||!p||!u)return;
     if(loading){again=true;return}
-    loading=true;const scopedMonth=month,scopedWeek=week;
+    loading=true;lastAttempt=Date.now();const scopedMonth=month,scopedWeek=week;
     try{
       let people=[];
       if(p.role==='admin'){
@@ -181,12 +193,24 @@
       if(month!==scopedMonth||week!==scopedWeek){again=true;return}
       show({people,months:mr.data||[],actuals:ar.data||[],previsions:wr.data||[]});
     }catch(e){
+      lastRenderSignature='';
       el.innerHTML=`<div class="lsp-error">Impossible de charger le suivi commercial : ${escape(e?.message||e)}</div><button type="button" id="lspRetry">Réessayer</button>`;
       el.querySelector('#lspRetry').onclick=load;
     }finally{
       loading=false;
       if(again){again=false;load()}
     }
+  }
+  // Grouper les notifications Supabase et les événements locaux : une seule
+  // relecture pour plusieurs changements très rapprochés.
+  function queueRefresh(){
+    if(!page()?.classList.contains('active'))return;
+    if(document.activeElement?.closest?.('#'+ROOT+' .lsp-controls')){
+      refreshAfterInput=true;
+      return;
+    }
+    if(refreshTimer!==null)clearTimeout(refreshTimer);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;load()},500);
   }
   function attachRealtime(){
     const client=sbClient(),p=profileData(),u=authUser();
@@ -197,20 +221,26 @@
     subscribedFor=key;
     const filter=p.role==='admin'?{}:{filter:'user_id=eq.'+u.id};
     channel=client.channel('rex-live-sales-'+u.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'monthly_forecasts',...filter},()=>{load();window.dispatchEvent(new Event('rex:commercial-data-changed'))})
-      .on('postgres_changes',{event:'*',schema:'public',table:'weekly_forecasts',...filter},()=>{load();window.dispatchEvent(new Event('rex:commercial-data-changed'))});
+      .on('postgres_changes',{event:'*',schema:'public',table:'monthly_forecasts',...filter},()=>{queueRefresh();window.dispatchEvent(new Event('rex:commercial-data-changed'))})
+      .on('postgres_changes',{event:'*',schema:'public',table:'weekly_forecasts',...filter},()=>{queueRefresh();window.dispatchEvent(new Event('rex:commercial-data-changed'))});
     channel.subscribe();
   }
   function start(){
     if(!mount()||!sbClient()||!profileData()||!authUser())return false;
-    load();attachRealtime();return true;
+    if(started)return true;
+    started=true;load();attachRealtime();return true;
   }
-  window.addEventListener('rex:monthly-sale-synced',()=>load());
-  window.addEventListener('rex:weekly-forecast-synced',()=>load());
-  document.addEventListener('click',e=>{if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(load,150)});
+  window.addEventListener('rex:monthly-sale-synced',queueRefresh);
+  window.addEventListener('rex:weekly-forecast-synced',queueRefresh);
+  document.addEventListener('click',e=>{if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(queueRefresh,150)});
+  document.addEventListener('focusout',e=>{
+    if(e.target?.closest?.('#'+ROOT+' .lsp-controls')&&refreshAfterInput){
+      refreshAfterInput=false;setTimeout(queueRefresh,150);
+    }
+  },true);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&page()?.classList.contains('active'))load()});
-  window.addEventListener('focus',()=>{if(page()?.classList.contains('active'))load()});
+  window.addEventListener('focus',queueRefresh);
   let attempts=0;const timer=setInterval(()=>{attempts++;if(start()||attempts>150)clearInterval(timer)},400);
-  setInterval(()=>{if(page()?.classList.contains('active')&&lastRun&&Date.now()-lastRun>20000)load()},5000);
+  setInterval(()=>{if(page()?.classList.contains('active')&&lastAttempt&&Date.now()-lastAttempt>30000)queueRefresh()},5000);
   window.addEventListener('load',()=>setTimeout(start,950));
 })();

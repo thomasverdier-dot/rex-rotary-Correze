@@ -10,6 +10,8 @@
  const uid=card=>card.querySelector('.fp-manager[id^="fpm_"]')?.id.slice(4)||card.querySelector('.fp-form .fp-main-save')?.dataset.uid||card.querySelector('[data-fpc]')?.dataset.fpc||card.querySelector('[data-fpa]')?.dataset.fpa||'';
  const euro=v=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(Number(v||0))+' k€';
  let items=new Map(),editing=new Map(),monthStatuses=new Map(),monthStatusError='';
+ const dirtyDrafts=new Set(); // Brouillons de prévisions conservés jusqu'à enregistrement.
+ let saving=false;
  function style(){if(document.getElementById('fridayForecastEditorStyle'))return;const s=document.createElement('style');s.id='fridayForecastEditorStyle';s.textContent=`
   #rexFridayPage .fp-nextweek{display:none!important}
   #rexFridayPage .fp-nextweek-editor{margin-top:10px;padding:15px;background:#f8fafc;border:1px solid #dbe5f1;border-radius:13px}
@@ -54,7 +56,9 @@
    if(canEdit(id)){
     const form=el.querySelector('form');
     form.elements.client.addEventListener('change',()=>form.classList.toggle('fp-edit-new',form.elements.client.value==='nouveau'));
-    form.querySelector('.fp-edit-cancel').addEventListener('click',()=>{editing.delete(id);form.reset();form.classList.remove('fp-edit-new');form.querySelector('.fp-edit-save').textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true});
+    form.addEventListener('input',()=>dirtyDrafts.add(id));
+    form.addEventListener('change',()=>dirtyDrafts.add(id));
+    form.querySelector('.fp-edit-cancel').addEventListener('click',()=>{editing.delete(id);dirtyDrafts.delete(id);form.reset();form.classList.remove('fp-edit-new');form.querySelector('.fp-edit-save').textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true});
     form.addEventListener('submit',e=>{e.preventDefault();save(id,el)});
    }
    el.querySelector('.fp-edit-wrap').addEventListener('click',e=>{
@@ -103,12 +107,12 @@
   const name=form.elements.company.value.trim(),amount=Number(form.elements.amount.value),probability=Number(form.elements.prob.value),newClient=form.elements.client.value==='nouveau';
   if(!name||!Number.isFinite(amount)||amount<=0||!Number.isInteger(probability)||probability<0||probability>100){msg.textContent='Vérifie le nom, le montant et la probabilité.';msg.classList.add('error');return}
   const values={company_name:name,amount,client_type:newClient?'nouveau':'acquis',sale_type:newClient?'classique':form.elements.sale.value,probability,negotiation_meeting_scheduled:form.elements.rdv.checked,updated_at:new Date().toISOString()};
-  const recordId=editing.get(id),btn=form.querySelector('.fp-edit-save');btn.disabled=true;msg.classList.remove('error');msg.textContent='Enregistrement…';
+  const recordId=editing.get(id),btn=form.querySelector('.fp-edit-save');btn.disabled=true;saving=true;msg.classList.remove('error');msg.textContent='Enregistrement…';
   try{
    const q=recordId?await client.from(TABLE).update(values).eq('id',recordId).eq('user_id',id).eq('week_start',date):await client.from(TABLE).insert({...values,user_id:id,week_start:date});
    if(q.error)throw q.error;
-   msg.textContent='Affaire enregistrée.';editing.delete(id);form.reset();form.classList.remove('fp-edit-new');btn.textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true;window.dispatchEvent(new Event('rex:weekly-forecast-synced'));await load();
-  }catch(e){msg.textContent='Erreur : '+(e?.message||e);msg.classList.add('error')}finally{btn.disabled=false}
+   msg.textContent='Affaire enregistrée.';editing.delete(id);dirtyDrafts.delete(id);form.reset();form.classList.remove('fp-edit-new');btn.textContent="Ajouter l'affaire";form.querySelector('.fp-edit-cancel').hidden=true;window.dispatchEvent(new Event('rex:weekly-forecast-synced'));await load();
+  }catch(e){msg.textContent='Erreur : '+(e?.message||e);msg.classList.add('error')}finally{btn.disabled=false;saving=false}
  }
  async function remove(id,el,recordId){
   if(!canEdit(id)||!confirm('Supprimer cette prévision S+1 ?'))return;
@@ -141,7 +145,11 @@
   const list=boxes();let newCard=false;
   for(const item of list){if(!item.card.querySelector('.fp-nextweek-editor'))newCard=true;attach(item)}
   const sig=date+'|'+list.map(x=>x.uid).join(',');
+  // Garder les champs remplis lors d'un rafraîchissement de fond.
+  // Après un changement de semaine, les formulaires sont reconstruits normalement.
+  if(saving)return;
+  if(sig===lastKey&&(editing.size||dirtyDrafts.size||document.activeElement?.closest?.('.fp-edit-form')))return;
   if(newCard||sig!==lastKey||Date.now()-refreshAt>60000)load();
  }
- setInterval(tick,1200);window.addEventListener('load',()=>setTimeout(tick,1700));
+ setInterval(tick,2500);window.addEventListener('load',()=>setTimeout(tick,1700));
 })();
