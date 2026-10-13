@@ -60,8 +60,8 @@
    if(node.matches('.fps-box'))return 'sales';
    if(node.matches('.fp-nextweek,.fp-forecast,.fp-nextweek-editor'))return 'forecast';
    if(node.matches('.fp-week-comment'))return 'comment';
-   if(node.matches('.fpa-box,.fpc-box,.fp-manager'))return 'actions';
-   if(node.matches('.fpr-box,.fp-summary-box'))return 'report';
+   if(node.matches('.fpa-box,.fpc-box'))return 'actions';
+   if(node.matches('.fp-manager,.fpr-box,.fp-summary-box'))return 'report';
    return null;
  }
  function stage(card){
@@ -92,6 +92,9 @@
     }
     body.prepend(tabs);
    }
+   const manager=body.querySelector(':scope > .fp-manager');
+   const report=body.querySelector(':scope > .fpr-box');
+   if(manager&&report&&manager.nextElementSibling!==report)body.insertBefore(manager,report);
    for(const child of [...body.children]){
      if(child===tabs||child.classList.contains('fp-workflow'))continue;
      let cat=category(child);
