@@ -21,6 +21,9 @@
       .mm-form{margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px}.mm-form-grid{display:grid;grid-template-columns:2fr 1fr 1.15fr 1.15fr;gap:10px}.mm-field label{display:block;font-size:10px;font-weight:900;color:#64748b;margin:0 0 5px}.mm-field input,.mm-field select{width:100%;min-height:43px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff} .mm-form-grid.nouveau-client{grid-template-columns:2fr 1fr 1.15fr}.mm-form-grid.nouveau-client .mm-sale-field{display:none!important}.mm-form-row2{display:grid;grid-template-columns:1fr 1.2fr auto;gap:10px;margin-top:10px;align-items:end}.mm-check{min-height:43px;display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;font-size:12px}.mm-add{min-height:43px;background:#0f6b47;color:#fff;border:0;border-radius:9px;padding:9px 18px;font-weight:900;cursor:pointer}.mm-add:disabled{opacity:.6;cursor:wait}
       .mm-totals{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.mm-pill{font-size:11px;background:#f4f7fb;border:1px solid #d7e0eb;border-radius:999px;padding:6px 9px}
       .mm-status{font-size:11px;color:#64748b;margin-bottom:10px}.mm-amount-edit{display:flex;align-items:center;gap:5px;white-space:nowrap}.mm-amount-input{width:88px;min-width:70px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font:inherit}.mm-amount-save{border:1px solid #b6d8c3;background:#e9f9ef;border-radius:8px;color:#166534;font-weight:800;padding:7px 9px;cursor:pointer}.mm-amount-save:disabled{opacity:.6;cursor:wait}.mm-table tr.mm-completed{background:#dcfce7!important}.mm-table tr.mm-completed td{border-color:#bbf7d0}.mm-complete-checkbox{width:18px;height:18px;accent-color:#15803d;cursor:pointer}.mm-sale-status{font-size:11px;color:#166534;font-weight:800}
+      .mm-date-signature{min-height:36px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b;font:inherit}
+      .mm-date-help{display:block;margin-top:5px;max-width:155px;color:#92400e;font-size:10px;line-height:1.3}
+      .mm-saved-indicator{display:block;margin-top:4px;font-size:10px;color:#166534}
       @media(max-width:1100px){.mm-grid{grid-template-columns:1fr}.mm-agency{grid-template-columns:repeat(2,1fr)}}
       @media(max-width:800px){.mm-form-grid{grid-template-columns:1fr 1fr}.mm-form-grid.nouveau-client{grid-template-columns:1fr 1fr}.mm-form-row2{grid-template-columns:1fr 1fr}.mm-add{grid-column:1/-1}.mm-agency{grid-template-columns:1fr 1fr}}
       @media(max-width:520px){.mm-form-grid,.mm-form-row2{grid-template-columns:1fr}.mm-form-grid.nouveau-client{grid-template-columns:1fr}.mm-agency{grid-template-columns:1fr}.mm-add{grid-column:auto}}
@@ -37,7 +40,7 @@
     addStyle();page.dataset.monthlyManualMounted='1';page.dataset.monthlyMounted='1';
     page.innerHTML=`
       <div class="mm-head"><div><h2>Prévisionnel mois</h2><p>Prévisions mensuelles : ajoutez des affaires manuellement ou depuis les signatures et S+1.</p></div><div class="mm-month"><label>Mois</label><input id="mmMonth" type="month" value="${selectedMonth}"></div></div>
-      <div class="mm-note"><b>Ajout manuel uniquement.</b> Dans le Point du vendredi, utilisez « Ajouter au mois » sur une prévision S+1 ou une signature. Cochez « Vente réalisée » dès qu'une affaire est signée.</div>
+      <div class="mm-note"><b>Signatures de la semaine.</b> Pour une affaire signée, renseignez la date de signature (du lundi au vendredi), puis cochez « Vente réalisée ». Elle figurera automatiquement dans le Point du vendredi correspondant. Les affaires non signées restent uniquement dans le prévisionnel du mois.</div>
       <div id="mmAgency" class="mm-agency"></div>
       <div id="mmStatus" class="mm-status">Chargement…</div>
       <div id="mmCards" class="mm-grid"></div>`;
@@ -71,13 +74,14 @@
     cards.querySelectorAll('.mm-amount-save').forEach(b=>b.onclick=()=>saveAmount(b.dataset.id,b));
     cards.querySelectorAll('.mm-amount-input').forEach(input=>input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();input.closest('td').querySelector('.mm-amount-save')?.click()}});
     cards.querySelectorAll('.mm-complete-checkbox').forEach(b=>b.onchange=()=>setCompleted(b.dataset.id,b.checked,b));
+    cards.querySelectorAll('.mm-date-signature').forEach(input=>input.onchange=()=>changeSignatureDate(input.dataset.id,input));
     cards.querySelectorAll('.mm-form').forEach(form=>{form.querySelector('.client').addEventListener('change',()=>syncSale(form));syncSale(form)});
   }
 
   function card(s){
     const list=deals.filter(d=>d.user_id===s.user_id),t=sums(list),id='mmf'+String(s.user_id).replaceAll('-','');
-    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="0.1" step="0.1" value="${Number(d.amount||0)}" data-id="${d.id}" aria-label="Montant en k€ pour ${esc(d.company_name||'Entreprise')}"><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer le montant">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="8" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
-    return `<div class="mm-card"><div class="mm-title"><h3>${esc(s.display_name||'Vendeur')}</h3><span>Secteur ${esc(s.sector_id||'—')}</span></div><div class="mm-wrap"><table class="mm-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Chance</th><th>RDV négo</th><th>Signature</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="mm-form" id="${id}"><div class="mm-form-grid"><div class="mm-field"><label>Entreprise</label><input class="company" placeholder="Nom de l’entreprise"></div><div class="mm-field"><label>Montant (k€)</label><input class="amount" type="number" min="0" step="0.1" placeholder="Ex. 12,5"></div><div class="mm-field"><label>Type de client</label><select class="client"><option value="acquis">Client acquis (CL)</option><option value="nouveau">Nouveau client (NC)</option></select></div><div class="mm-field mm-sale-field"><label>Type de vente</label><select class="sale"><option value="classique">RNV (renouvellement)</option><option value="up_sell">UC (Up/Cross)</option></select></div></div><div class="mm-form-row2"><div class="mm-field"><label>Probabilité (%)</label><input class="prob" type="number" min="0" max="100" value="50"></div><label class="mm-check"><input class="rdv" type="checkbox"> RDV négociation prévu</label><button class="mm-add" data-uid="${s.user_id}">Ajouter au mois</button></div></div><div class="mm-totals"><span class="mm-pill">CL : <b>${euro(t.cl)}</b></span><span class="mm-pill">NC : <b>${euro(t.nc)}</b></span><span class="mm-pill">Up/Cross : <b>${euro(t.upcross)}</b></span><span class="mm-pill">Total : <b>${euro(t.total)}</b></span></div></div>`;
+    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="0.1" step="0.1" value="${Number(d.amount||0)}" data-id="${d.id}" aria-label="Montant en k€ pour ${esc(d.company_name||'Entreprise')}"><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer le montant">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td><input class="mm-date-signature" type="date" data-id="${d.id}" value="${esc(d.signature_date||'')}" aria-label="Date de signature de ${esc(d.company_name)}"><span class="mm-date-help">${d.sale_completed&&!d.signature_date?'Date requise pour intégrer aux signatures':''}</span></td><td><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
+    return `<div class="mm-card"><div class="mm-title"><h3>${esc(s.display_name||'Vendeur')}</h3><span>Secteur ${esc(s.sector_id||'—')}</span></div><div class="mm-wrap"><table class="mm-table"><thead><tr><th>Entreprise</th><th>Montant</th><th>Client</th><th>Vente</th><th>Chance</th><th>RDV négo</th><th>Date de signature</th><th>Signature</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="mm-form" id="${id}"><div class="mm-form-grid"><div class="mm-field"><label>Entreprise</label><input class="company" placeholder="Nom de l’entreprise"></div><div class="mm-field"><label>Montant (k€)</label><input class="amount" type="number" min="0" step="0.1" placeholder="Ex. 12,5"></div><div class="mm-field"><label>Type de client</label><select class="client"><option value="acquis">Client acquis (CL)</option><option value="nouveau">Nouveau client (NC)</option></select></div><div class="mm-field mm-sale-field"><label>Type de vente</label><select class="sale"><option value="classique">RNV (renouvellement)</option><option value="up_sell">UC (Up/Cross)</option></select></div></div><div class="mm-form-row2"><div class="mm-field"><label>Probabilité (%)</label><input class="prob" type="number" min="0" max="100" value="50"></div><label class="mm-check"><input class="rdv" type="checkbox"> RDV négociation prévu</label><button class="mm-add" data-uid="${s.user_id}">Ajouter au mois</button></div></div><div class="mm-totals"><span class="mm-pill">CL : <b>${euro(t.cl)}</b></span><span class="mm-pill">NC : <b>${euro(t.nc)}</b></span><span class="mm-pill">Up/Cross : <b>${euro(t.upcross)}</b></span><span class="mm-pill">Total : <b>${euro(t.total)}</b></span></div></div>`;
   }
 
   async function addDeal(uid,button){
@@ -105,16 +109,61 @@
     deal.amount=Number(result.data.amount);
     render();
   }
+  // La semaine commerciale commence lundi et s'acheve vendredi.
+  function validSignatureDate(date){
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date||''))return false;
+    const day=new Date(date+'T12:00:00').getDay();
+    return day>=1&&day<=5;
+  }
+  function ownDeal(deal){
+    const p=getProfile(),u=getUser();
+    return !!deal&&!!p&&!!u&&(p.role==='admin'||deal.user_id===u.id);
+  }
+  async function saveSignature(id,changes,refresh=true){
+    const deal=deals.find(d=>d.id===id),client=getSb();
+    if(!deal||!client||!ownDeal(deal))return {ok:false,message:'Modification non autorisée.'};
+    const result=await client.from('monthly_forecasts')
+      .update({...changes,updated_at:new Date().toISOString()})
+      .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start)
+      .select('id,sale_completed,signature_date').maybeSingle();
+    if(result.error||!result.data)return {ok:false,message:result.error?.message||'Enregistrement non confirmé.'};
+    Object.assign(deal,result.data);
+    if(refresh)render();
+    return {ok:true};
+  }
   async function setCompleted(id,checked,checkbox){
-    const client=getSb(),p=getProfile(),u=getUser(),deal=deals.find(x=>x.id===id);
-    if(!client||!deal||!p||!u)return;
-    if(p.role!=='admin'&&deal.user_id!==u.id){checkbox.checked=!checked;return}
-    checkbox.disabled=true;
-    const result=await client.from('monthly_forecasts').update({sale_completed:checked,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',deal.user_id);
-    checkbox.disabled=false;
-    if(result.error){checkbox.checked=!checked;alert('Impossible de modifier le statut : '+result.error.message);return}
-    deal.sale_completed=checked;
-    checkbox.closest('tr')?.classList.toggle('mm-completed',checked);
+    const deal=deals.find(d=>d.id===id);
+    if(!ownDeal(deal)){checkbox.checked=!checked;return}
+    const input=checkbox.closest('tr')?.querySelector('.mm-date-signature');
+    const date=input?.value||deal.signature_date||'';
+    if(checked&&!validSignatureDate(date)){
+      checkbox.checked=false;
+      alert('Sélectionne une date de signature du lundi au vendredi avant de valider la vente.');
+      input?.focus();return;
+    }
+    if(!checked&&deal.sale_completed&&!confirm('Annuler la validation de cette vente ? La signature créée automatiquement depuis le mois sera retirée du Point du vendredi.')){
+      checkbox.checked=true;return;
+    }
+    checkbox.disabled=true;if(input)input.disabled=true;
+    const result=await saveSignature(id,{sale_completed:checked,signature_date:checked?date:null});
+    if(!result.ok){checkbox.checked=!!deal.sale_completed;alert('Impossible de valider la vente : '+result.message)}
+    checkbox.disabled=false;if(input)input.disabled=false;
+  }
+  async function changeSignatureDate(id,input){
+    const deal=deals.find(d=>d.id===id);
+    if(!ownDeal(deal)){input.value=deal?.signature_date||'';return}
+    if(input.value&&!validSignatureDate(input.value)){
+      alert('Les signatures doivent être datées du lundi au vendredi (hors week-end).');
+      input.value=deal.signature_date||'';return;
+    }
+    if(!deal.sale_completed)return; // La date est enregistrée à la validation.
+    if(!input.value){
+      alert('Décoche « Vente réalisée » avant de retirer sa date de signature.');
+      input.value=deal.signature_date||'';return;
+    }
+    input.disabled=true;
+    const result=await saveSignature(id,{signature_date:input.value});
+    if(!result.ok){input.value=deal.signature_date||'';input.disabled=false;alert('Date non enregistrée : '+result.message)}
   }
   async function delDeal(id){
     if(!confirm('Supprimer cette affaire du prévisionnel mensuel ?'))return;
