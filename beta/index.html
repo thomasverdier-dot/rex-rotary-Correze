@@ -67,7 +67,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_12');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_13');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=4'),
@@ -116,6 +116,17 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-splus1-editor.js?v=3')
     ];
     for(const src of modules)await addScript(doc,src);
+    // Charger la présentation épurée dans l'iframe avant de l'afficher.
+    // Le CSS est isolé au prévisionnel mensuel : aucune logique métier modifiée.
+    const freshStyle=doc.createElement('link');
+    freshStyle.rel='stylesheet';
+    freshStyle.href=local('beta/monthly-visual-refresh.css?v=1');
+    const styleReady=new Promise(resolve=>{
+      freshStyle.onload=()=>resolve(true);
+      freshStyle.onerror=()=>resolve(false);
+    });
+    doc.head.appendChild(freshStyle);
+    await Promise.race([styleReady,sleep(3500)]);
     await unregisterWorkers();
   }
 
