@@ -67,11 +67,11 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_4');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_5');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=4'),
-      local('beta/monthly-forecast.js?v=3'),
+      local('beta/monthly-forecast.js?v=4'),
 
       local('ui-v3.js?v=2'),
       local('beta/admin-seller-management.js?v=1'),
