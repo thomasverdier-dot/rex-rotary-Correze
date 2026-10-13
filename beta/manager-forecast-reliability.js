@@ -232,7 +232,7 @@
       ${hist.length?`<div class="mfr-scroll"><table><thead><tr><th>Période</th><th>Début</th><th>Annonce figée</th><th>CA réellement signé</th><th>Réalisé / annoncé</th><th>Écart</th></tr></thead>
         <tbody>${snapRows}</tbody></table></div>`:
         '<p class="mfr-no-history">Pas encore de période terminée avec une prévision figée. Les ratios de fiabilité réels apparaîtront une fois les annonces et leurs résultats disponibles.</p>'}
-      <div class="mfr-warn">Les données antérieures aux premières prévisions figées peuvent être incomplètes. Les pourcentages « affaires validées » indiquent l'avancement du mois, <b>pas une performance définitive</b>. Les coefficients historiques nécessitent au moins quatre semaines clôturées et correctement renseignées.</div>
+      ${!atLeast4?'<div class="mfr-warn">Les données antérieures aux premières prévisions figées peuvent être incomplètes. Il faut au moins quatre semaines clôturées pour établir une fiabilité historique par vendeur.</div>':'<p class="mfr-note">Les ratios historiques comparent des prévisions figées avant la semaine au CA réellement signé. Ils restent indicatifs et ne sont pas appliqués automatiquement aux projections.</p>'}
       ${changeStatus?`<p class="mfr-error">${escape(changeStatus)}</p>`:''}
       <p id="mfrFeedback" class="${error?'mfr-error':'mfr-ok'}" role="status">${escape(error||message)}</p>
       <p class="mfr-note">Dernière actualisation : ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}. Le gel de prévision enregistre une photo privée de ton annonce ; il ne change aucune donnée de vente.</p>`;
@@ -354,7 +354,10 @@
     refreshTimeout=setTimeout(()=>{refreshTimeout=null;load()},950);
   }
   function start(){
-    if(!isManager()||!db()||!userData()||!mount())return false;
+    const p=profileData();
+    if(!p)return false;
+    if(p.role!=='admin')return true; // Module absent et aucune requête sur les comptes commerciaux.
+    if(!db()||!userData()||!mount())return false;
     if(started)return true;
     started=true;load();
     return true;
