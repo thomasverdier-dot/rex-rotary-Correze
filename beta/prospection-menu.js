@@ -1,4 +1,4 @@
-/* Menu Prospection de la version beta : rassemble Carte, prospection physique et téléphonique sans modifier leurs pages. */
+/* Menu Prospection : Carte, prospections et mise à jour des entreprises (admin seulement). */
 (()=>{
   const NAV='#rexShellV3 .rex-nav';
   const ID='rexProspectionMenu';
@@ -56,9 +56,23 @@
       group.classList.toggle('open',open);
       toggle.setAttribute('aria-expanded',String(open));
     }
+    let companyUpdate=null;
     function sync(){
-      const selected=map.classList.contains('active')||physical.classList.contains('active')||phone.classList.contains('active');
+      const selected=[map,physical,phone,companyUpdate].some(button=>button?.classList.contains('active'));
       group.classList.toggle('current',selected);
+    }
+    // Le bouton entreprise est créé plus tard par son module, uniquement pour
+    // les administrateurs. Déplacer le vrai bouton conserve ses permissions,
+    // son onclick et toutes les fonctionnalités déjà présentes.
+    function attachCompanyUpdate(){
+      const button=nav.querySelector('button[data-page="companyupdate"]');
+      if(!button||button===companyUpdate)return;
+      if(button.parentElement!==nav&&button.parentElement!==submenu)return;
+      submenu.appendChild(button);
+      button.textContent='↻ Mise à jour entreprises';
+      companyUpdate=button;
+      watcher.observe(button,{attributes:true,attributeFilter:['class']});
+      sync();
     }
     toggle.addEventListener('click',()=>setOpen(!group.classList.contains('open')));
     nav.addEventListener('click',event=>{
@@ -72,6 +86,11 @@
     watcher.observe(map,{attributes:true,attributeFilter:['class']});
     watcher.observe(physical,{attributes:true,attributeFilter:['class']});
     watcher.observe(phone,{attributes:true,attributeFilter:['class']});
+    // Observe uniquement les ajouts directs dans la navigation, sans reboucler
+    // lors des changements de classes ou des re-rendus des pages.
+    const navWatcher=new MutationObserver(attachCompanyUpdate);
+    navWatcher.observe(nav,{childList:true});
+    attachCompanyUpdate();
     sync();
     if(group.classList.contains('current'))setOpen(true);
     return true;
