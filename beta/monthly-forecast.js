@@ -157,8 +157,8 @@
     return {ok:true};
   }
   function readSignedEuros(raw){
-    const normalized=String(raw||'').trim().replace(/[\\s\\u00a0\\u202f]/g,'').replace(',','.');
-    if(!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized))return null;
+    const normalized=String(raw||'').trim().replace(/[\s\u00a0\u202f]/g,'').replace(',','.');
+    if(!/^\d+(?:\.\d{1,2})?$/.test(normalized))return null;
     const amount=Number(normalized);
     return Number.isFinite(amount)&&amount>0?Math.round(amount*100)/100:null;
   }
