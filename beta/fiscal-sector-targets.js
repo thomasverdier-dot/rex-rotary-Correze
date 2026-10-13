@@ -35,7 +35,10 @@
   }
 
   function renderAgency(){
-    const el=document.getElementById('fstAgencyKpis');if(!el)return;const d=agencyTotals();
+    const el=document.getElementById('fstAgencyKpis');if(!el)return;
+    const caption=el.closest('.fst-card')?.querySelector('.fst-sub');
+    if(caption)caption.textContent='CA / NC / UC fiscal cumulés par secteur, comparés à l’objectif indépendant de l’agence.';
+    const d=agencyTotals();
     const k=(label,done,t)=>{const p=pct(done,t),r=remain(t,done);return `<div class="fst-kpi"><b>${label}</b><strong>${fmt(done)} / ${fmt(t)}</strong><small>Reste à faire : <span class="${r===0?'fst-ok':'fst-remain'}">${fmt(r)}</span> · ${p}% atteint</small><div class="fst-bar"><i style="width:${Math.min(100,p)}%"></i></div></div>`};
     el.innerHTML=k('CA',d.ca,agency.ca_target)+k('NC',d.nc,agency.nc_target)+k('UP/CROSS',d.upcross,agency.upcross_target);
   }
