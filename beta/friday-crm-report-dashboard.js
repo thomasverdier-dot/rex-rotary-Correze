@@ -65,9 +65,10 @@
     const p=home();if(!p)return null;
     style();let el=p.querySelector('#'+ROOT);
     if(!el){el=document.createElement('section');el.id=ROOT;el.innerHTML='<h3>Chiffres du vendredi</h3><p>Chargement…</p>';p.prepend(el)}
-    const annual=p.querySelector('#dashboardSalesKpis'),head=p.querySelector('.rex-page-head');
-    if(annual&&annual.nextElementSibling!==el)annual.insertAdjacentElement('afterend',el);
-    else if(!annual&&head&&head.nextElementSibling!==el)head.insertAdjacentElement('afterend',el);
+    const live=p.querySelector('#rexLiveSalesPerformance'),annual=p.querySelector('#dashboardSalesKpis'),head=p.querySelector('.rex-page-head');
+    if(live&&live.nextElementSibling!==el)live.insertAdjacentElement('afterend',el);
+    else if(!live&&annual&&annual.nextElementSibling!==el)annual.insertAdjacentElement('afterend',el);
+    else if(!live&&!annual&&head&&head.nextElementSibling!==el)head.insertAdjacentElement('afterend',el);
     return el;
   }
   function card(label,value,note,key){
@@ -81,10 +82,10 @@
       const a=sales.filter(x=>x.user_id===p.user_id),b=forecast.filter(x=>x.user_id===p.user_id);
       return {name:p.display_name||'Commercial',sector:p.sector_id,totals:totals(a,b)};
     });
-    const suspects=duplicateHints(sales);
+    const suspects=[]; // Montants certifiés via les seules ventes mensuelles validées.
     el.innerHTML=`
       <div class="fwr-head"><div><h3>📋 Chiffres du vendredi — à reporter dans le CRM professionnel</h3>
-        <div class="fwr-sub">${isManager?'Agence Corrèze':'Mon activité'} · calculs depuis les signatures et le prévisionnel S+1</div></div>
+        <div class="fwr-sub">${isManager?'Agence Corrèze':'Mon activité'} · calculs depuis les ventes validées (sans doublons) et le prévisionnel S+1</div></div>
         <div class="fwr-controls">
           <button type="button" data-fwr-week="-7">←</button>
           <label for="fwrDate" class="fwr-sub">Semaine du</label>
@@ -141,8 +142,8 @@ Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €
       if(!people.length){el.innerHTML='<div class="fwr-error">Aucun vendeur trouvé.</div>';return}
       const users=people.map(x=>x.user_id);
       const [sr,fr]=await Promise.all([
-        client.from('friday_signed_deals').select('id,user_id,company_name,client_type,source_kind,amount,signed_amount_eur')
-          .eq('week_start',selected).in('user_id',users),
+        client.from('monthly_forecasts').select('id,user_id,company_name,client_type,amount,signed_amount_eur,signature_date')
+          .eq('sale_completed',true).gte('signature_date',selected).lt('signature_date',shift(selected,7)).in('user_id',users),
         client.from('weekly_forecasts').select('id,user_id,company_name,client_type,amount')
           .eq('week_start',shift(selected,7)).in('user_id',users)
       ]);
@@ -162,6 +163,8 @@ Prévision S+1 (${french(next)} au ${french(nextEnd)}) : ${plain(sums.next)} €
     if(e.target?.closest?.('.rex-nav button[data-page="dashboard"]'))setTimeout(()=>load(),160);
   });
   window.addEventListener('rex:monthly-sale-synced',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
+  window.addEventListener('rex:weekly-forecast-synced',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
+  window.addEventListener('rex:commercial-data-changed',()=>{if(home()?.classList.contains('active'))setTimeout(load,200)});
   let n=0;const t=setInterval(()=>{n++;if(boot()||n>160)clearInterval(t)},400);
   setInterval(()=>{if(home()?.classList.contains('active')&&lastLoad&&Date.now()-lastLoad>60000)load()},10000);
   window.addEventListener('load',()=>setTimeout(boot,900));
