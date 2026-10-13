@@ -62,7 +62,12 @@
    const sumMaybe=(items)=>{const entries=items.filter(x=>x!=null);return entries.length?entries.reduce((a,b)=>a+b,0):null};
    const actual=(uid,y,m,field)=>currentData(uid,y,m,field);
    const historic=(uid,y,m,field)=>historicalData(uid,y,m,field);
-   const totals=(y,m,field,source)=>sumMaybe(people.map(p=>source(p.user_id,y,m,field)));
+   // Un total agence n'est comparable que si chaque vendeur possède une ligne
+   // d'historique N-1. Sinon, signaler clairement la donnée manquante.
+   const totals=(y,m,field,source)=>{
+     const entries=people.map(p=>source(p.user_id,y,m,field));
+     return entries.length&&entries.every(v=>v!==null)?entries.reduce((a,b)=>a+b,0):null;
+   };
    const before=prev(year,month);
    const totCur=totals(year,month,'ca',actual),totPrev=totals(before.year,before.month,'ca',actual),
       totLast=totals(year-1,month,'ca',historic);
@@ -151,7 +156,7 @@
             <span class="rxh-bar rxh-bar-last ${x.last==null?'rxh-no-data':''}" title="${safe(x.name)} ${historyYear} : ${fmt(x.last)}" style="height:${pct(x.last)}%"></span>
            </div><small>${safe(x.name)}</small></div>`).join('')}
      </div>
-     <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Le NC et l'UC sont inclus dans le CA.</p></div>
+     <p class="rxh-note">Les ventes de l'année en cours proviennent des signatures validées dans « Prévisionnel mois ». Les archives N-1 proviennent de la saisie CA / NC / UC ci-dessous. Une cellule « Non renseigné » ne représente pas 0 €. Le total N-1 agence reste indisponible si un vendeur manque. Le NC et l'UC sont inclus dans le CA.</p></div>
      <details class="rxh-editor" id="rxhEditor" ${editorOpen?'open':''}>
        <summary>✎ Saisir ou corriger le CA, NC et UC de ${historyYear}, mois par mois et par vendeur</summary>
        <p>Uniquement visible et modifiable par le responsable. Montants à saisir en <b>euros</b> : ils sont enregistrés dans le suivi CA fiscal existant (qui utilise les k€).</p>
@@ -165,7 +170,13 @@
      <p class="rxh-${messageType==='error'?'error':'ok'}" id="rxhMessage" role="status">${safe(message)}</p>`;
    box.innerHTML=layout;
    const monthInput=box.querySelector('#rxhMonth');
-   monthInput.onchange=e=>{const [y,m]=String(e.target.value).split('-').map(Number);if(y>=2020&&y<=2099&&m>=1&&m<=12){year=y;month=m;lastOutput='';load()}};
+   monthInput.onchange=e=>{
+     if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Des chiffres historiques sont en cours de saisie. Changer de période sans les enregistrer ?')){
+       e.target.value=iso(year,month);return;
+     }
+     const [y,m]=String(e.target.value).split('-').map(Number);
+     if(y>=2020&&y<=2099&&m>=1&&m<=12){year=y;month=m;lastOutput='';load()}
+   };
    box.querySelector('#rxhReload').onclick=()=>load();
    box.querySelector('#rxhSeller').onchange=e=>{selectedSeller=e.target.value;lastOutput='';draw()};
    box.querySelector('#rxhMetric').onchange=e=>{metric=e.target.value;lastOutput='';draw()};
@@ -214,6 +225,7 @@
      if(result.error)throw result.error;
      message=`${changes.length} mois enregistré${changes.length>1?'s':''} pour ${people.find(p=>p.user_id===uid)?.display_name||'le commercial'}.`;
      messageType='ok';lastOutput='';
+     form.dataset.dirty='0';
      await load();
    }catch(e){setMessage('Impossible de sauvegarder les chiffres historiques : '+String(e?.message||e),'error')}
    finally{saving=false;btn.disabled=false;btn.textContent='Enregistrer les 12 mois'}
@@ -239,7 +251,7 @@
      sales=sa.data||[];
      rows=hi.data||[];
      if(!people.some(p=>p.user_id===selectedSeller))selectedSeller=people[0]?.user_id||'';
-     loaded=true;lastOutput='';messageType='ok';draw();
+     loaded=true;lastOutput='';if(!message)messageType='ok';draw();
    }catch(e){box.innerHTML=`<div class="rxh-error">Impossible de charger les comparaisons : ${safe(e?.message||e)}</div><button type="button" id="rxhRetry">Réessayer</button>`;box.querySelector('#rxhRetry').onclick=load}
    finally{busy=false;if(pending){pending=false;load()}}
  }
