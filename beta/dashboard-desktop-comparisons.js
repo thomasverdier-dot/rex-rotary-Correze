@@ -1,6 +1,7 @@
 (function comparisonModule(){
  'use strict';
  const ROOT='rexHistoryComparison';
+ const SECTORS=[1,2,3,4];
  const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
  const currency=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
  const fmt=c=>c==null?'Non renseigné':currency.format(c/100);
@@ -20,14 +21,14 @@
  let year=now.getFullYear(),month=now.getMonth()+1,people=[],selectedSeller='',metric='ca',
      rows=[],sales=[],loaded=false,busy=false,pending=false,saving=false,lastFetch=0,timer=null,
      message='',messageType='',editorOpen=false,historyOpen=true,active=false,lastOutput='';
- function rowKey(uid,y,m){return `${uid}|${iso(y,m)}`}
+ function rowKey(sec,y,m){return `${Number(sec)}|${iso(y,m)}`}
  function historyMap(records){
    const map=new Map();
    for(const r of records){
      const fy=Number(r.fiscal_start_year),idx=Number(r.month_index);
      if(idx<1||idx>12)continue;
      const cy=idx<=9?fy:fy+1, cm=idx<=9?idx+3:idx-9;
-     map.set(rowKey(r.user_id,cy,cm),r);
+     map.set(rowKey(r.sector_id,cy,cm),r);
    }
    return map;
  }
@@ -36,7 +37,11 @@
    for(const x of deals){
      const date=String(x.signature_date||'').slice(0,7),user=x.user_id;
      if(!/^\d{4}-\d{2}$/.test(date)||!user)continue;
-     const k=`${user}|${date}`,v=map.get(k)||{ca:0,nc:0,upcross:0,count:0};
+     // Les archives fiscales sont par secteur, donc regrouper aussi les
+     // signatures du CRM par le secteur actuellement attribué à chaque compte.
+     const sector=people.find(p=>p.user_id===user)?.sector_id;
+     if(!SECTORS.includes(Number(sector)))continue;
+     const k=`${Number(sector)}|${date}`,v=map.get(k)||{ca:0,nc:0,upcross:0,count:0};
      const amount=money(x.signed_amount_eur);
      v.ca+=amount;
      if(x.client_type==='nouveau')v.nc+=amount;
@@ -47,38 +52,48 @@
    return map;
  }
  function compute(){
-   const hist=historyMap(rows),current=signedMap(sales);
-   const first=monthFirst(sales);
-   function monthFirst(s){const sorted=s.filter(x=>x.signature_date).map(x=>String(x.signature_date).slice(0,7)).sort();return sorted[0]||null}
-   // Avant la première signature enregistrée, les archives mensuelles sont incomplètes.
+   const hist=historyMap(rows),signed=signedMap(sales),current=hist;
+   const signedMonths=sales.filter(x=>x.signature_date).map(x=>String(x.signature_date).slice(0,7)).sort();
+   const first=signedMonths[0]||null;
    const nowPeriod=iso(now.getFullYear(),now.getMonth()+1);
-   const currentData=(uid,y,m,field)=>{
-     if(iso(y,m)>nowPeriod||!first||iso(y,m)<first)return null;
-     return current.get(rowKey(uid,y,m))?.[field]??0;
+   const historicalData=(sec,y,m,field)=>{
+     const row=hist.get(rowKey(sec,y,m));return row? kilo(row[field]):null;
    };
-   const historicalData=(uid,y,m,field)=>{
-     const x=hist.get(rowKey(uid,y,m));return x? kilo(x[field]):null;
+   const currentData=(sec,y,m,field)=>{
+     const period=iso(y,m),fiscalValue=historicalData(sec,y,m,field);
+     if(period>nowPeriod)return null;
+     // Mois fiscal clôturé : le CA déclaré au logiciel métier fait foi.
+     if(period<nowPeriod&&fiscalValue!==null)return fiscalValue;
+     // Mois en cours : priorité aux ventes CRM signées (suivi en direct).
+     const live=signed.get(rowKey(sec,y,m));
+     if(period===nowPeriod&&live)return live[field];
+     if(fiscalValue!==null)return fiscalValue;
+     // Pas de résultat avant les premières signatures suivies par le CRM.
+     if(first&&period>=first)return live?.[field]??0;
+     return null;
    };
-   const sumMaybe=(items)=>{const entries=items.filter(x=>x!=null);return entries.length?entries.reduce((a,b)=>a+b,0):null};
-   const actual=(uid,y,m,field)=>currentData(uid,y,m,field);
-   const historic=(uid,y,m,field)=>historicalData(uid,y,m,field);
-   // Un total agence n'est comparable que si chaque vendeur possède une ligne
-   // d'historique N-1. Sinon, signaler clairement la donnée manquante.
+   const actual=(sec,y,m,field)=>currentData(sec,y,m,field);
+   const historic=(sec,y,m,field)=>historicalData(sec,y,m,field);
    const totals=(y,m,field,source)=>{
-     const entries=people.map(p=>source(p.user_id,y,m,field));
-     return entries.length&&entries.every(v=>v!==null)?entries.reduce((a,b)=>a+b,0):null;
+     const values=SECTORS.map(sec=>source(sec,y,m,field));
+     return values.every(x=>x!==null)?values.reduce((a,b)=>a+b,0):null;
    };
    const before=prev(year,month);
-   const totCur=totals(year,month,'ca',actual),totPrev=totals(before.year,before.month,'ca',actual),
-      totLast=totals(year-1,month,'ca',historic);
-   const data=people.map(p=>{
-     const get=(y,m,field)=>actual(p.user_id,y,m,field);
-     const histGet=(y,m,field)=>historic(p.user_id,y,m,field);
-     return {person:p,ca:get(year,month,'ca'),nc:get(year,month,'nc'),uc:get(year,month,'upcross'),
+   const totCur=totals(year,month,'ca',actual),
+     totPrev=totals(before.year,before.month,'ca',actual),
+     totLast=totals(year-1,month,'ca',historic);
+   const data=SECTORS.map(sec=>{
+     const assigned=people.filter(p=>Number(p.sector_id)===sec);
+     const name=assigned.map(p=>p.display_name||'Commercial').join(', ');
+     const get=(y,m,field)=>actual(sec,y,m,field);
+     const histGet=(y,m,field)=>historic(sec,y,m,field);
+     return {sector:sec,name,ca:get(year,month,'ca'),nc:get(year,month,'nc'),uc:get(year,month,'upcross'),
        prev:get(before.year,before.month,'ca'),last:histGet(year-1,month,'ca'),
        lastNc:histGet(year-1,month,'nc'),lastUc:histGet(year-1,month,'upcross')};
    });
-   return {hist,current,first,nowPeriod,currentData,historicalData,actual,historic,totals,before,totCur,totPrev,totLast,data};
+   const currentSource=SECTORS.some(sec=>historyMap(rows).has(rowKey(sec,year,month)))&&iso(year,month)<nowPeriod?
+     'Suivi CA fiscal':'Ventes validées CRM / fiscal';
+   return {hist,current,signed,first,nowPeriod,currentData,historicalData,actual,historic,totals,before,totCur,totPrev,totLast,data,currentSource};
  }
  function delta(value,base){
    if(value==null||base==null)return '<span class="rxh-muted">—</span>';
