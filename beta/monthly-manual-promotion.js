@@ -50,6 +50,7 @@
           probability:kind==='signed'?100:Number(source.probability??50),
           negotiation_meeting_scheduled:kind==='signed'?false:!!source.negotiation_meeting_scheduled,
           sale_completed:kind==='signed',
+          signed_amount_eur:kind==='signed'?Number(source.signed_amount_eur??Math.round(Number(source.amount)*100000)/100):null,
           source_type:kind,source_id:source.id
         };
         const r=await client.from('monthly_forecasts').insert(row).select('id').single();
