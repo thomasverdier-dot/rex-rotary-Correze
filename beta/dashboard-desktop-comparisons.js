@@ -91,7 +91,7 @@
        prev:get(before.year,before.month,'ca'),last:histGet(year-1,month,'ca'),
        lastNc:histGet(year-1,month,'nc'),lastUc:histGet(year-1,month,'upcross')};
    });
-   const currentSource=SECTORS.some(sec=>historyMap(rows).has(rowKey(sec,year,month)))&&iso(year,month)<nowPeriod?
+   const currentSource=SECTORS.some(sec=>hist.has(rowKey(sec,year,month)))&&iso(year,month)<nowPeriod?
      'Suivi CA fiscal':'Ventes validées CRM / fiscal';
    return {hist,current,signed,first,nowPeriod,currentData,historicalData,actual,historic,totals,before,totCur,totPrev,totLast,data,currentSource};
  }
@@ -142,9 +142,10 @@
    const dataRows=data.map(d=>`<tr><th scope="row">Secteur ${d.sector} <small>${safe(d.name||'Non affecté actuellement')}</small></th>
         <td><strong>${fmt(d.ca)}</strong></td><td>${fmt(d.prev)}</td><td>${fmt(d.last)}</td>
         <td>${delta(d.ca,d.prev)}</td><td>${delta(d.ca,d.last)}</td>
-        <td>${fmt(d.nc)}</td><td>${fmt(d.uc)}</td></tr>`).join('');
+        <td>${fmt(d.nc)}</td><td>${fmt(d.lastNc)}</td><td>${fmt(d.uc)}</td><td>${fmt(d.lastUc)}</td></tr>`).join('');
    const summary=`<tr class="rxh-total"><th>Agence Corrèze</th><td>${fmt(totCur)}</td><td>${fmt(totPrev)}</td><td>${fmt(totLast)}</td><td>${delta(totCur,totPrev)}</td><td>${delta(totCur,totLast)}</td>
-        <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year,month,'upcross',result.actual))}</td></tr>`;
+        <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year-1,month,'nc',result.historic))}</td>
+        <td>${fmt(result.totals(year,month,'upcross',result.actual))}</td><td>${fmt(result.totals(year-1,month,'upcross',result.historic))}</td></tr>`;
    const nonEntered=SECTORS.filter(sec=>!hist.get(rowKey(sec,historyYear,month))).length;
    const output=JSON.stringify([year,month,people,data,rows,sales,metric,selectedSeller,editorOpen,historyOpen,message,messageType]);
    if(lastOutput===output&&box.querySelector('#rxhMonth'))return;
@@ -160,7 +161,7 @@
        <article class="rxh-kpi"><span>Écart € vs N-1</span><strong>${totCur==null||totLast==null?'—':fmt(totCur-totLast)}</strong><small>${totLast==null?`${nonEntered} secteur(s) encore à renseigner`:'Comparaison des deux mêmes mois'}</small></article>
      </div>
      <div class="rxh-panel"><div class="rxh-panel-head"><div><h4>Comparatif des résultats par secteur</h4><p>Évolution CA du secteur : mois actuel, M-1 et même mois N-1. Les noms correspondent à l'affectation actuelle.</p></div></div>
-     <div class="rxh-scroll"><table class="rxh-table"><thead><tr><th>Commercial</th><th>CA actuel</th><th>CA M-1</th><th>CA N-1</th><th>Vs M-1</th><th>Vs N-1</th><th>NC actuel</th><th>UC actuel</th></tr></thead><tbody>${dataRows}${summary}</tbody></table></div></div>
+     <div class="rxh-scroll"><table class="rxh-table"><thead><tr><th>Secteur / vendeur actuel</th><th>CA actuel</th><th>CA M-1</th><th>CA N-1</th><th>Vs M-1</th><th>Vs N-1</th><th>NC actuel</th><th>NC N-1</th><th>UC actuel</th><th>UC N-1</th></tr></thead><tbody>${dataRows}${summary}</tbody></table></div></div>
      <div class="rxh-panel"><div class="rxh-panel-head rxh-historic-head"><div><h4>Historique mensuel par secteur</h4><p>${metricLabel} ${year} / ${historyYear} · seules les périodes renseignées sont représentées.</p></div>
        <div class="rxh-small-controls"><label for="rxhSeller">Secteur</label><select id="rxhSeller">${SECTORS.map(sec=>`<option value="${sec}" ${Number(selectedSeller)===sec?'selected':''}>Secteur ${sec} ${safe(people.filter(p=>Number(p.sector_id)===sec).map(p=>p.display_name).join(', ')||'· non affecté')}</option>`).join('')}</select>
        <label for="rxhMetric">Indicateur</label><select id="rxhMetric"><option value="ca" ${metric==='ca'?'selected':''}>CA</option><option value="nc" ${metric==='nc'?'selected':''}>NC</option><option value="upcross" ${metric==='upcross'?'selected':''}>UC</option></select></div></div>
