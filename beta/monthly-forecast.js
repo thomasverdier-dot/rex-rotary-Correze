@@ -131,7 +131,7 @@
     button.disabled=true;
     const row={user_id:uid,month_start:monthStart(selectedMonth),company_name:company,amount,client_type:box.querySelector('.client').value,sale_type:box.querySelector('.client').value==='nouveau'?'classique':box.querySelector('.sale').value,probability:prob,negotiation_meeting_scheduled:box.querySelector('.rdv').checked};
     const r=await client.from('monthly_forecasts').insert(row);button.disabled=false;
-    if(r.error){alert(r.error.message);return}await load();
+    if(r.error){alert(r.error.message);return}window.dispatchEvent(new Event('rex:monthly-sale-synced'));await load();
   }
 
   async function saveAmount(id,button){
@@ -155,6 +155,7 @@
       return;
     }
     deal.amount=Number(result.data.amount);
+    window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     render();
   }
   // La semaine commerciale commence lundi et s'acheve vendredi.
