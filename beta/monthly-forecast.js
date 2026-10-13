@@ -108,14 +108,17 @@
     cards.querySelectorAll('.mm-sign-amount').forEach(input=>input.onkeydown=e=>{
       if(e.key==='Enter'){e.preventDefault();input.closest('.mm-sign-panel')?.querySelector('.mm-sign-save')?.click()}
     });
-    cards.querySelectorAll('.mm-date-signature').forEach(input=>input.onchange=()=>changeSignatureDate(input.dataset.id,input));
+    // Montant exact et date sont enregistrés ensemble par « Enregistrer la vente ».
+    cards.querySelectorAll('.mm-date-signature').forEach(input=>input.onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();input.closest('.mm-sign-panel')?.querySelector('.mm-sign-save')?.click()}
+    });
     cards.querySelectorAll('.mm-form').forEach(form=>{form.querySelector('.client').addEventListener('change',()=>syncSale(form));syncSale(form)});
   }
 
   function card(s){
     const list=deals.filter(d=>d.user_id===s.user_id),t=sums(list),id='mmf'+String(s.user_id).replaceAll('-','');
-    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="0.1" step="0.1" value="${Number(d.amount||0)}" data-id="${d.id}" aria-label="Prévision en k€ pour ${esc(d.company_name||'Entreprise')}"><span class="mm-amount-unit">k€</span><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer la prévision en k€">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td><input class="mm-date-signature" type="date" data-id="${d.id}" value="${esc(d.signature_date||'')}" aria-label="Date de signature de ${esc(d.company_name)}"><span class="mm-date-help">${d.sale_completed&&!d.signature_date?'Date requise pour intégrer aux signatures':''}</span></td><td><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label><div class="mm-sign-panel" data-id="${d.id}" ${d.sale_completed?'':'hidden'}><label for="mmSign_${d.id}">Montant exact signé (€)</label><input id="mmSign_${d.id}" class="mm-sign-amount" data-id="${d.id}" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex. 1 398,88" value="${esc(signedInput(d))}"><button type="button" class="mm-sign-save" data-id="${d.id}">${d.sale_completed?'Modifier le montant signé':'Enregistrer la vente'}</button><small>En euros, avec les centimes. La prévision en k€ ne change pas.</small></div></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="9" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
-    return `<details class="mm-card mm-seller-details" data-seller="${esc(s.user_id)}" ${sellerExpanded(s.user_id)?'open':''}><summary class="mm-title"><span class="mm-seller-name"><h3>${esc(s.display_name||'Vendeur')}</h3><span>Secteur ${esc(s.sector_id||'—')}</span></span><span class="mm-seller-overview"><span class="mm-seller-count">${list.length} affaire${list.length>1?'s':''}</span><strong class="mm-seller-total">${euro(t.total)}</strong><span class="mm-chevron" aria-hidden="true">⌄</span></span></summary><div class="mm-seller-content"><div class="mm-wrap"><table class="mm-table"><thead><tr><th>Entreprise</th><th>Prévision (k€)</th><th>Client</th><th>Vente</th><th>Chance</th><th>RDV négo</th><th>Date de signature</th><th>Signature</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="mm-form" id="${id}"><div class="mm-form-grid"><div class="mm-field"><label>Entreprise</label><input class="company" placeholder="Nom de l’entreprise"></div><div class="mm-field"><label>Montant (k€)</label><input class="amount" type="number" min="0" step="0.1" placeholder="Ex. 12,5"></div><div class="mm-field"><label>Type de client</label><select class="client"><option value="acquis">Client acquis (CL)</option><option value="nouveau">Nouveau client (NC)</option></select></div><div class="mm-field mm-sale-field"><label>Type de vente</label><select class="sale"><option value="classique">RNV (renouvellement)</option><option value="up_sell">UC (Up/Cross)</option></select></div></div><div class="mm-form-row2"><div class="mm-field"><label>Probabilité (%)</label><input class="prob" type="number" min="0" max="100" value="50"></div><label class="mm-check"><input class="rdv" type="checkbox"> RDV négociation prévu</label><button class="mm-add" data-uid="${s.user_id}">Ajouter au mois</button></div></div><div class="mm-totals"><span class="mm-pill">CL : <b>${euro(t.cl)}</b></span><span class="mm-pill">NC : <b>${euro(t.nc)}</b></span><span class="mm-pill">Up/Cross : <b>${euro(t.upcross)}</b></span><span class="mm-pill">Total : <b>${euro(t.total)}</b></span></div></div></details>`;
+    const rows=list.length?list.map(d=>`<tr class="${d.sale_completed?'mm-completed':''}"><td><b>${esc(d.company_name||'Entreprise')}</b></td><td><div class="mm-amount-edit"><input class="mm-amount-input" type="number" min="0.1" step="0.1" value="${Number(d.amount||0)}" data-id="${d.id}" aria-label="Prévision en k€ pour ${esc(d.company_name||'Entreprise')}"><span class="mm-amount-unit">k€</span><button type="button" class="mm-amount-save" data-id="${d.id}" title="Enregistrer la prévision en k€">Enregistrer</button></div></td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${d.client_type==='nouveau'?'—':d.sale_type==='up_sell'||d.sale_type==='cross_sell'?'UC':'RNV'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td><td class="mm-completion-cell"><label class="mm-sale-status"><input class="mm-complete-checkbox" type="checkbox" data-id="${d.id}" ${d.sale_completed?'checked':''}> Vente réalisée</label><div class="mm-sign-panel" data-id="${d.id}" ${d.sale_completed?'':'hidden'}><div class="mm-sign-fields"><div class="mm-sign-field"><label for="mmSign_${d.id}">Montant exact signé (€)</label><input id="mmSign_${d.id}" class="mm-sign-amount" data-id="${d.id}" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex. 1 398,88" value="${esc(signedInput(d))}"></div><div class="mm-sign-field"><label for="mmDate_${d.id}">Date de signature</label><input id="mmDate_${d.id}" class="mm-date-signature" data-id="${d.id}" type="date" value="${esc(d.signature_date||'')}" aria-label="Date de signature de ${esc(d.company_name)}"></div></div><div class="mm-sign-actions"><span class="mm-date-help">${d.sale_completed&&!d.signature_date?'Date à renseigner pour le Point du vendredi':''}</span><button type="button" class="mm-sign-save" data-id="${d.id}">${d.sale_completed?'Enregistrer les modifications':'Enregistrer la vente'}</button></div></div></td><td><button class="mm-del" data-id="${d.id}" title="Supprimer">✕</button></td></tr>`).join(''):'<tr><td colspan="8" class="mm-empty">Aucune affaire saisie pour ce mois.</td></tr>';
+    return `<details class="mm-card mm-seller-details" data-seller="${esc(s.user_id)}" ${sellerExpanded(s.user_id)?'open':''}><summary class="mm-title"><span class="mm-seller-name"><h3>${esc(s.display_name||'Vendeur')}</h3><span>Secteur ${esc(s.sector_id||'—')}</span></span><span class="mm-seller-overview"><span class="mm-seller-count">${list.length} affaire${list.length>1?'s':''}</span><strong class="mm-seller-total">${euro(t.total)}</strong><span class="mm-chevron" aria-hidden="true">⌄</span></span></summary><div class="mm-seller-content"><div class="mm-wrap"><table class="mm-table"><thead><tr><th>Entreprise</th><th>Prévision (k€)</th><th>Client</th><th>Vente</th><th>Chance</th><th>RDV négo</th><th>Vente réalisée</th><th></th></tr></thead><tbody>${rows}</tbody></table></div><div class="mm-form" id="${id}"><div class="mm-form-grid"><div class="mm-field"><label>Entreprise</label><input class="company" placeholder="Nom de l’entreprise"></div><div class="mm-field"><label>Montant (k€)</label><input class="amount" type="number" min="0" step="0.1" placeholder="Ex. 12,5"></div><div class="mm-field"><label>Type de client</label><select class="client"><option value="acquis">Client acquis (CL)</option><option value="nouveau">Nouveau client (NC)</option></select></div><div class="mm-field mm-sale-field"><label>Type de vente</label><select class="sale"><option value="classique">RNV (renouvellement)</option><option value="up_sell">UC (Up/Cross)</option></select></div></div><div class="mm-form-row2"><div class="mm-field"><label>Probabilité (%)</label><input class="prob" type="number" min="0" max="100" value="50"></div><label class="mm-check"><input class="rdv" type="checkbox"> RDV négociation prévu</label><button class="mm-add" data-uid="${s.user_id}">Ajouter au mois</button></div></div><div class="mm-totals"><span class="mm-pill">CL : <b>${euro(t.cl)}</b></span><span class="mm-pill">NC : <b>${euro(t.nc)}</b></span><span class="mm-pill">Up/Cross : <b>${euro(t.upcross)}</b></span><span class="mm-pill">Total : <b>${euro(t.total)}</b></span></div></div></details>`;
   }
 
   async function addDeal(uid,button){
@@ -193,8 +196,9 @@
       input.focus();return;
     }
     const date=dateField?.value||deal.signature_date||'';
-    if(date&&!validSignatureDate(date)){
-      alert('La date de signature doit être du lundi au vendredi.');dateField?.focus();return;
+    if(!validSignatureDate(date)){
+      alert('Renseigne une date de signature du lundi au vendredi pour enregistrer la vente.');
+      dateField?.focus();return;
     }
     if(signedEuro>100000&&!confirm('Confirmer la vente de '+signedEuro.toLocaleString('fr-FR',{style:'currency',currency:'EUR'})+' ?'))return;
     button.disabled=true;input.disabled=true;
@@ -202,7 +206,7 @@
     const result=await saveSignature(id,{
       sale_completed:true,
       signed_amount_eur:signedEuro,
-      signature_date:date||null
+      signature_date:date
     });
     if(!result.ok){
       button.disabled=false;input.disabled=false;
@@ -233,22 +237,6 @@
     checkbox.disabled=true;
     const result=await saveSignature(id,{sale_completed:false,signed_amount_eur:null,signature_date:null});
     if(!result.ok){checkbox.checked=true;checkbox.disabled=false;alert('Impossible d’annuler la vente : '+result.message)}
-  }
-  async function changeSignatureDate(id,input){
-    const deal=deals.find(d=>d.id===id);
-    if(!ownDeal(deal)){input.value=deal?.signature_date||'';return}
-    if(input.value&&!validSignatureDate(input.value)){
-      alert('Les signatures doivent être datées du lundi au vendredi (hors week-end).');
-      input.value=deal.signature_date||'';return;
-    }
-    if(!deal.sale_completed)return; // La date est enregistrée à la validation.
-    if(!input.value){
-      alert('Décoche « Vente réalisée » avant de retirer sa date de signature.');
-      input.value=deal.signature_date||'';return;
-    }
-    input.disabled=true;
-    const result=await saveSignature(id,{signature_date:input.value});
-    if(!result.ok){input.value=deal.signature_date||'';input.disabled=false;alert('Date non enregistrée : '+result.message)}
   }
   async function delDeal(id){
     if(!confirm('Supprimer cette affaire du prévisionnel mensuel ?'))return;
