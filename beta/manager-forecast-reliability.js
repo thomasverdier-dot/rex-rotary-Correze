@@ -175,6 +175,7 @@
       <td>${euros(s.month.openRaw)}</td><td>${euros(s.month.openExpected)}</td>
       <td class="mfr-strong">${euros(s.month.expected)}</td>
       <td>${s.month.count?Math.round(100*s.month.signedNumber/s.month.count)+' %':'—'}</td>
+      <td>${s.month.gross?Math.round(100*s.month.ca/s.month.gross)+' %':'—'}</td>
       <td>${historicalRatios.get(s.user_id)?.ratio===null?'En construction':Math.round(100*historicalRatios.get(s.user_id).ratio)+' %'}</td></tr>`).join('');
     const weeklyRows=sellers.map(s=>`<tr><td>${escape(s.name)} · S${escape(s.sector)}</td>
       <td>${s.week.count}</td><td>${euros(s.week.gross)}</td>
@@ -202,9 +203,9 @@
       </div>
       <div class="mfr-note">Estimation du mois = CA signé (montant exact en €) + affaires non signées × probabilité renseignée par les vendeurs. Prévision brute inchangée dans le CRM. ${monthSum.pending} affaire${monthSum.pending!==1?'s':''} encore ouverte${monthSum.pending!==1?'s':''} (${euros(monthSum.openRaw)} non pondérés).</div>
       <details class="mfr-sub"><summary>Détail et ratios du mois par commercial</summary>
-        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires</th><th>Prévision brute</th><th>CA signé</th><th>Non signé brut</th><th>Non signé pondéré</th><th>Estimation</th><th>Affaires validées à date</th><th>Fiabilité S+1 historisée</th></tr></thead>
-          <tbody>${monthlyRows||'<tr><td colspan="9">Aucun vendeur.</td></tr>'}</tbody></table></div>
-        <p class="mfr-note">« Affaires validées à date » mesure l'avancement du mois, pas la fiabilité historique du commercial.</p>
+        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires</th><th>Prévision brute</th><th>CA signé</th><th>Non signé brut</th><th>Non signé pondéré</th><th>Estimation</th><th>Affaires validées à date</th><th>CA signé / prévision à date</th><th>Fiabilité S+1 historisée</th></tr></thead>
+          <tbody>${monthlyRows||'<tr><td colspan="10">Aucun vendeur.</td></tr>'}</tbody></table></div>
+        <p class="mfr-note">Les taux « affaires validées » et « CA signé / prévision » mesurent l'avancement du mois, pas la fiabilité historique du commercial.</p>
       </details>
       <div class="mfr-actions">
         <button class="mfr-primary" data-save="month" type="button" ${monthSum.count&&!working?'':'disabled'}>Figer ma prévision du mois</button>
