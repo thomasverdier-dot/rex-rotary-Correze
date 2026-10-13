@@ -48,7 +48,7 @@
     const end=snapshot.period_type==='week'?shift(snapshot.period_start,7):monthAfter(snapshot.period_start.slice(0,7));
     const today=iso(new Date());
     const taken=String(snapshot.created_at||'').slice(0,10);
-    return end<=today&&taken<end;
+    return end<=today&&(snapshot.period_type==='week'?taken<=snapshot.period_start:taken<end);
   }
   function realized(snapshot,signs){
     const from=snapshot.period_start,until=snapshot.period_type==='week'?shift(from,7):monthAfter(from.slice(0,7));
@@ -284,6 +284,7 @@
     if(!summary.count){error='Aucune affaire prévue : rien à enregistrer.';message='';show();return}
     const until=kind==='month'?monthAfter(month):shift(week,7);
     if(until<=iso(new Date())){error='Cette période est déjà terminée. Tu peux consulter l’historique, mais pas créer une nouvelle annonce après coup.';message='';show();return}
+    if(kind==='week'&&period<iso(new Date())){error='Une prévision S+1 doit être figée avant le début de la semaine concernée, au plus tard le lundi.';message='';show();return}
     if(!confirm(`Conserver une copie privée de la prévision ${kind==='month'?'du mois':'S+1'} : ${euros(summary.expected)} ? Elle ne pourra pas être modifiée, afin de mesurer ensuite l'écart avec le CA réalisé.`))return;
     working=true;error='';message='Enregistrement de ta prévision…';show();
     try{
