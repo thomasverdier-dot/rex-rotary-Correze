@@ -107,6 +107,7 @@
     button.disabled=false;input.disabled=false;
     if(result.error||!result.data){alert('Impossible d’enregistrer le montant : '+(result.error?.message||'Aucune ligne modifiée.'));return}
     deal.amount=Number(result.data.amount);
+    window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     render();
   }
   // La semaine commerciale commence lundi et s'acheve vendredi.
@@ -128,6 +129,7 @@
       .select('id,sale_completed,signature_date').maybeSingle();
     if(result.error||!result.data)return {ok:false,message:result.error?.message||'Enregistrement non confirmé.'};
     Object.assign(deal,result.data);
+    window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     if(refresh)render();
     return {ok:true};
   }
@@ -167,7 +169,7 @@
   }
   async function delDeal(id){
     if(!confirm('Supprimer cette affaire du prévisionnel mensuel ?'))return;
-    const client=getSb();if(!client)return;const r=await client.from('monthly_forecasts').delete().eq('id',id);if(r.error){alert(r.error.message);return}await load();
+    const client=getSb();if(!client)return;const r=await client.from('monthly_forecasts').delete().eq('id',id);if(r.error){alert(r.error.message);return}window.dispatchEvent(new Event('rex:monthly-sale-synced'));await load();
   }
 
   window.loadMonthlyForecast=load;
