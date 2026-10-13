@@ -44,7 +44,7 @@
      });
      const sectors=[1,2,3,4].map(sec=>matching.find(x=>Number(x.sector_id)===sec)||null);
      const aggregate=field=>sectors.every(Boolean)?sectors.reduce((sum,row)=>sum+kilo(row[field]),0):null;
-     return {month:monthNum,sectors,ca:aggregate('ca'),nc:aggregate('nc'),upcross:aggregate('upcross')};
+     result.push({month:monthNum,sectors,ca:aggregate('ca'),nc:aggregate('nc'),upcross:aggregate('upcross')});
    }
    return result;
  }
