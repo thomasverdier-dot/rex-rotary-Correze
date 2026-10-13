@@ -40,11 +40,11 @@
    @media(max-width:700px){#rexFridayPage .fp-tabs button{min-width:calc(50% - 5px)}#rexFridayPage .fp-tools label{flex:1}#rexFridayPage .fp-tools select{min-width:0;width:100%}}
   `;document.head.appendChild(el);
  }
- const money=(v)=>{let t=String(v||'').replace(/[^\\d,.-]/g,'').replace(',','.');let n=Number(t);return Number.isFinite(n)?n:0};
+ const money=(v)=>{let t=String(v||'').replace(/[^\d,.-]/g,'').replace(',','.');let n=Number(t);return Number.isFinite(n)?n:0};
  function metric(card,name){const x=[...card.querySelectorAll('.fp-metric')].find(el=>el.querySelector('span')?.textContent?.toLowerCase().includes(name));return x?.querySelector('b')?.textContent?.trim()||'—'}
- function numPercent(card){let el=[...card.querySelectorAll('.fp-metric em')];let vals=el.map(e=>Number(e.textContent.match(/(\\d+)%/)?.[1])).filter(Number.isFinite);return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0}
+ function numPercent(card){let el=[...card.querySelectorAll('.fp-metric em')];let vals=el.map(e=>Number(e.textContent.match(/(\d+)%/)?.[1])).filter(Number.isFinite);return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0}
  function signed(card){const x=card.querySelector('.fps-kpis');let t=[...x?.querySelectorAll('.fps-pill')||[]].find(x=>/total signé/i.test(x.textContent));return t?.querySelector('b')?.textContent?.trim()||'—'}
- function sector(card){let m=card.querySelector('.fp-seller-head span')?.textContent?.match(/Secteur\\s*(\\d+)/i);return m?Number(m[1]):99}
+ function sector(card){let m=card.querySelector('.fp-seller-head span')?.textContent?.match(/Secteur\s*(\d+)/i);return m?Number(m[1]):99}
  function status(percent){return percent>=100?'high':percent>=80?'mid':'low'}
  function info(card){
   let p=numPercent(card),head=card.querySelector('.fp-seller-head');if(!head)return;
