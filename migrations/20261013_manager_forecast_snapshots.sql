@@ -17,6 +17,7 @@ CREATE INDEX IF NOT EXISTS idx_manager_forecast_snapshots_manager_period
 ON public.manager_forecast_snapshots (manager_user_id, period_type, period_start, created_at DESC);
 ALTER TABLE public.manager_forecast_snapshots ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.manager_forecast_snapshots FROM anon;
+REVOKE ALL ON public.manager_forecast_snapshots FROM authenticated;
 GRANT SELECT, INSERT ON public.manager_forecast_snapshots TO authenticated;
 DROP POLICY IF EXISTS manager_forecast_snapshots_select ON public.manager_forecast_snapshots;
 CREATE POLICY manager_forecast_snapshots_select ON public.manager_forecast_snapshots
