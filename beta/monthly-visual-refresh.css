@@ -716,3 +716,77 @@
     max-width: 320px;
   }
 }
+
+
+/* Deux listes distinctes sous chaque vendeur : affaires en cours puis signatures. */
+.rex-page[data-page="monthly"] .mm-section-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:13px 16px 10px;
+  border-top:1px solid #e8edf2;
+  background:#fff;
+}
+.rex-page[data-page="monthly"] .mm-section-head:first-child {
+  border-top:0;
+}
+.rex-page[data-page="monthly"] .mm-section-head h4 {
+  margin:0;
+  color:#2e4460;
+  font-size:12px;
+  font-weight:830;
+  letter-spacing:.01em;
+}
+.rex-page[data-page="monthly"] .mm-section-head > span {
+  color:#7d8b9c;
+  font-size:11px;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+.rex-page[data-page="monthly"] .mm-section-head-signed {
+  padding-top:16px;
+  margin-top:10px;
+  border-top:1px solid #dcece3;
+  background:#f9fcfa;
+}
+.rex-page[data-page="monthly"] .mm-section-head-signed h4 {
+  color:#24724f;
+}
+.rex-page[data-page="monthly"] .mm-section-head-signed > span {
+  color:#24724f;
+}
+.rex-page[data-page="monthly"] .mm-signed-table {
+  min-width:980px;
+}
+.rex-page[data-page="monthly"] .mm-signed-table th {
+  background:#fcfefd;
+}
+.rex-page[data-page="monthly"] .mm-signed-table tr.mm-completed {
+  background:transparent!important;
+}
+.rex-page[data-page="monthly"] .mm-signed-table tr.mm-completed td:first-child {
+  border-left:3px solid #a5d4ba;
+  padding-left:9px;
+}
+.rex-page[data-page="monthly"] .mm-signed-table tr.mm-completed td {
+  border-bottom-color:#eff4f0;
+}
+.rex-page[data-page="monthly"] .mm-signed-table .mm-completion-cell {
+  width:360px;
+  min-width:340px;
+}
+.rex-page[data-page="monthly"] .mm-empty {
+  color:#94a0ad;
+  font-size:12px;
+  padding:18px!important;
+}
+@media(max-width:650px){
+  .rex-page[data-page="monthly"] .mm-section-head {
+    padding:12px 10px;
+  }
+  .rex-page[data-page="monthly"] .mm-signed-table {
+    min-width:930px;
+  }
+}
