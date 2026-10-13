@@ -145,16 +145,21 @@
     }
     button.disabled=true;input.disabled=true;
     // Le montant exact signé, stocké en euros, ne doit JAMAIS être modifié ici.
-    const result=await client.from('monthly_forecasts')
+    // Verrouillage optimiste : ne pas écraser un montant corrigé depuis un autre compte.
+    let query=client.from('monthly_forecasts')
       .update({amount:entered,updated_at:new Date().toISOString()})
-      .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start)
-      .select('id,amount').maybeSingle();
+      .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start);
+    if(deal.updated_at)query=query.eq('updated_at',deal.updated_at);
+    let result;
+    try{result=await query.select('id,amount,updated_at').maybeSingle()}
+    catch(error){result={error}}
     button.disabled=false;input.disabled=false;
     if(result.error||!result.data){
-      alert('Impossible de modifier la prévision : '+(result.error?.message||'Modification non confirmée.'));
+      alert('Impossible de modifier la prévision : '+(result.error?.message||'Cette affaire a été modifiée depuis un autre compte. Actualise le prévisionnel et réessaie.'));
       return;
     }
     deal.amount=Number(result.data.amount);
+    deal.updated_at=result.data.updated_at||deal.updated_at;
     window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     render();
   }
@@ -171,11 +176,16 @@
   async function saveSignature(id,changes,refresh=true){
     const deal=deals.find(d=>d.id===id),client=getSb();
     if(!deal||!client||!ownDeal(deal))return {ok:false,message:'Modification non autorisée.'};
-    const result=await client.from('monthly_forecasts')
+    // Un autre commercial ou responsable a peut-être déjà corrigé cette vente.
+    // Conserver sa saisie plutôt que la remplacer silencieusement.
+    let query=client.from('monthly_forecasts')
       .update({...changes,updated_at:new Date().toISOString()})
-      .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start)
-      .select('id,sale_completed,signature_date,amount,signed_amount_eur').maybeSingle();
-    if(result.error||!result.data)return {ok:false,message:result.error?.message||'Enregistrement non confirmé.'};
+      .eq('id',id).eq('user_id',deal.user_id).eq('month_start',deal.month_start);
+    if(deal.updated_at)query=query.eq('updated_at',deal.updated_at);
+    let result;
+    try{result=await query.select('id,sale_completed,signature_date,amount,signed_amount_eur,updated_at').maybeSingle()}
+    catch(error){result={error}}
+    if(result.error||!result.data)return {ok:false,message:result.error?.message||'Cette vente a déjà été modifiée depuis un autre compte. Actualise le prévisionnel, puis réessaie.'};
     Object.assign(deal,result.data);
     window.dispatchEvent(new Event('rex:monthly-sale-synced'));
     if(refresh)render();
@@ -244,7 +254,13 @@
   }
   async function delDeal(id){
     if(!confirm('Supprimer cette affaire du prévisionnel mensuel ?'))return;
-    const client=getSb();if(!client)return;const r=await client.from('monthly_forecasts').delete().eq('id',id);if(r.error){alert(r.error.message);return}window.dispatchEvent(new Event('rex:monthly-sale-synced'));await load();
+    const client=getSb(),deal=deals.find(d=>d.id===id);if(!client||!ownDeal(deal))return;
+    let query=client.from('monthly_forecasts').delete().eq('id',id).eq('user_id',deal.user_id);
+    if(deal.updated_at)query=query.eq('updated_at',deal.updated_at);
+    let r;
+    try{r=await query.select('id').maybeSingle()}catch(error){r={error}}
+    if(r.error||!r.data){alert('Suppression impossible : '+(r.error?.message||'Cette affaire a été modifiée entre-temps. Actualise le prévisionnel avant de la supprimer.'));return}
+    window.dispatchEvent(new Event('rex:monthly-sale-synced'));await load();
   }
 
   window.loadMonthlyForecast=load;
