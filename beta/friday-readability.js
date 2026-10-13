@@ -31,7 +31,9 @@
    #rexFridayPage .fp-body[data-fp-view="activity"]>[data-fp-panel]:not([data-fp-panel="activity"]),
    #rexFridayPage .fp-body[data-fp-view="sales"]>[data-fp-panel]:not([data-fp-panel="sales"]),
    #rexFridayPage .fp-body[data-fp-view="actions"]>[data-fp-panel]:not([data-fp-panel="actions"]),
-   #rexFridayPage .fp-body[data-fp-view="report"]>[data-fp-panel]:not([data-fp-panel="report"]){display:none!important}
+   #rexFridayPage .fp-body[data-fp-view="report"]>[data-fp-panel]:not([data-fp-panel="report"]),
+   #rexFridayPage .fp-body[data-fp-view="forecast"]>[data-fp-panel]:not([data-fp-panel="forecast"]),
+   #rexFridayPage .fp-body[data-fp-view="comment"]>[data-fp-panel]:not([data-fp-panel="comment"]){display:none!important}
    #rexFridayPage .fp-workflow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
    #rexFridayPage .fp-workflow span{font-size:10px;padding:5px 8px;background:#f1f5f9;border-radius:999px;color:#64748b}
    #rexFridayPage .fp-workflow span.done{background:#dcfce7;color:#166534}
@@ -55,7 +57,9 @@
  }
  function category(node){
    if(node.matches('.fp-metrics,.fp-month,.fp-analysis,.fp-form'))return 'activity';
-   if(node.matches('.fps-box,.fp-nextweek,.fp-forecast'))return 'sales';
+   if(node.matches('.fps-box'))return 'sales';
+   if(node.matches('.fp-nextweek,.fp-forecast,.fp-nextweek-editor'))return 'forecast';
+   if(node.matches('.fp-week-comment'))return 'comment';
    if(node.matches('.fpa-box,.fpc-box,.fp-manager'))return 'actions';
    if(node.matches('.fpr-box,.fp-summary-box'))return 'report';
    return null;
@@ -70,6 +74,8 @@
     ['Ventes',signedCount>0],
     ['Contrôles',checks.length>0&&checks.every(c=>c.checked)],
     ['Actions',!!card.querySelector('.mgr-actions')?.value?.trim()],
+    ['Prévision S+1',card.querySelectorAll('.fp-nextweek-editor tbody tr[data-id]').length>0],
+    ['Commentaire',!!card.querySelector('.fp-week-comment textarea')?.value?.trim()],
     ['Compte rendu',!!report]
    ];
  }
@@ -79,7 +85,7 @@
    let tabs=body.querySelector(':scope > .fp-tabs');
    if(!tabs){
     tabs=document.createElement('div');tabs.className='fp-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Rubriques du Point vendredi');
-    for(const [k,label] of [['activity','Activité'],['sales','Ventes'],['actions','Actions'],['report','Compte rendu']]){
+    for(const [k,label] of [['activity','Activité'],['sales','Ventes réalisées'],['actions','Actions'],['forecast','Prév. S+1'],['comment','Commentaire'],['report','Compte rendu']]){
       const btn=document.createElement('button');btn.type='button';btn.dataset.view=k;btn.textContent=label;btn.setAttribute('role','tab');
       btn.addEventListener('click',()=>{state.tab.set(id,k);configure(card,i)});
       tabs.append(btn);
