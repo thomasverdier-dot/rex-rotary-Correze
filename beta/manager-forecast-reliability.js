@@ -26,7 +26,7 @@
   const isManager=()=>profileData()?.role==='admin';
   const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
   let month=monthOf(now),week=nextWeek,requesting=false,pending=false,started=false,lastRefresh=0,refreshTimeout=null,working=false,open=true,
-    snapshots=[],source=null,error='',message='',historicalSigned=[],historyReady=false;
+    snapshots=[],source=null,error='',message='',historicalSigned=[],historyReady=false,lastSignature='';
 
   function weighted(rows){return sum(rows,r=>Math.round(planC(r.amount)*frac(r.probability)))}
   function summarizeMonth(deals,signed){
@@ -76,8 +76,23 @@
       return {s,actual,estimate,diff:actual-estimate,ratio:estimate>0?actual/estimate:null};
     }).sort((a,b)=>b.s.period_start.localeCompare(a.s.period_start)).slice(0,12);
   }
-  function validityText(valid){
-    return valid?'Comparaison disponible':'Historique insuffisant';
+  function sellerHistoricalRatio(userId,history,signs){
+    const eligible=history.filter(row=>row.s.period_type==='week');
+    let periods=0,predicted=0,actual=0;
+    for(const row of eligible){
+      const details=Array.isArray(row.s.seller_details)?row.s.seller_details:[];
+      const seller=details.find(x=>x.user_id===userId);
+      if(!seller||!Number(seller.estimated_cents))continue;
+      periods++;
+      predicted+=Number(seller.estimated_cents);
+      actual+=realizedForUser(row.s,signs,userId);
+    }
+    // Ne pas calculer de coefficient sur un petit échantillon.
+    return {periods,predicted,actual,ratio:periods>=4&&predicted>0?actual/predicted:null};
+  }
+  function realizedForUser(snapshot,signs,userId){
+    const end=snapshot.period_type==='week'?shift(snapshot.period_start,7):monthAfter(snapshot.period_start.slice(0,7));
+    return sum(signs.filter(r=>r.user_id===userId&&r.signature_date>=snapshot.period_start&&r.signature_date<end),r=>roundC(r.signed_amount_eur));
   }
   function style(){
     if(document.getElementById('rexManagerForecastStyle'))return;
@@ -146,20 +161,26 @@
     const box=mount();if(!box||!source)return;
     const {people,months,monthSigned,weekly}=source,monthSum=summarizeMonth(months,monthSigned),
       weekSum=summarizeWeek(weekly),sellers=perSeller(people,months,monthSigned,weekly);
-    const hist=historyAnalysis(snapshots,historicalSigned);
-    const atLeast4=hist.filter(x=>x.s.period_type==='week').length>=4;
+    const hist=historyReady?historyAnalysis(snapshots,historicalSigned):[];
+    const historicalRatios=new Map(sellers.map(s=>[s.user_id,sellerHistoricalRatio(s.user_id,hist,historicalSigned)]));
+    const atLeast4=sellers.some(s=>historicalRatios.get(s.user_id)?.ratio!==null);
     const changeStatus=source?.snapshotError||'';
+    const signature=JSON.stringify([month,week,months,monthSigned,weekly,snapshots,historicalSigned,historyReady,working,error,message,changeStatus]);
+    if(lastSignature===signature&&box.querySelector('#mfrFeedback'))return;
+    const expandedDetails=[...box.querySelectorAll('details.mfr-sub')].map(el=>el.open);
     const snapshotCount=snapshots.filter(x=>x.period_start===month+'-01'&&x.period_type==='month').length;
     const weekSnapshotCount=snapshots.filter(x=>x.period_start===week&&x.period_type==='week').length;
     const monthlyRows=sellers.map(s=>`<tr><td>${escape(s.name)} · S${escape(s.sector)}</td>
       <td>${s.month.count}</td><td>${euros(s.month.gross)}</td><td class="mfr-strong">${euros(s.month.ca)}</td>
       <td>${euros(s.month.openRaw)}</td><td>${euros(s.month.openExpected)}</td>
       <td class="mfr-strong">${euros(s.month.expected)}</td>
-      <td>${s.month.count?Math.round(100*s.month.signedNumber/s.month.count)+' %':'—'}</td></tr>`).join('');
+      <td>${s.month.count?Math.round(100*s.month.signedNumber/s.month.count)+' %':'—'}</td>
+      <td>${historicalRatios.get(s.user_id)?.ratio===null?'En construction':Math.round(100*historicalRatios.get(s.user_id).ratio)+' %'}</td></tr>`).join('');
     const weeklyRows=sellers.map(s=>`<tr><td>${escape(s.name)} · S${escape(s.sector)}</td>
       <td>${s.week.count}</td><td>${euros(s.week.gross)}</td>
       <td class="mfr-strong">${euros(s.week.expected)}</td>
-      <td>${s.week.count&&s.week.gross?Math.round(s.week.expected/s.week.gross*100)+' %':'—'}</td></tr>`).join('');
+      <td>${s.week.count&&s.week.gross?Math.round(s.week.expected/s.week.gross*100)+' %':'—'}</td>
+      <td>${historicalRatios.get(s.user_id)?.ratio===null?'En construction':Math.round(100*historicalRatios.get(s.user_id).ratio)+' %'}</td></tr>`).join('');
     const snapRows=hist.map(x=>`<tr><td>${x.s.period_type==='month'?'Mois':'S+1'}</td><td>${dateTitle(x.s.period_start)}</td>
       <td>${euros(x.estimate)}</td><td class="mfr-strong">${euros(x.actual)}</td>
       <td>${x.ratio===null?'—':Math.round(x.ratio*100)+' %'}</td>
@@ -181,8 +202,8 @@
       </div>
       <div class="mfr-note">Estimation du mois = CA signé (montant exact en €) + affaires non signées × probabilité renseignée par les vendeurs. Prévision brute inchangée dans le CRM. ${monthSum.pending} affaire${monthSum.pending!==1?'s':''} encore ouverte${monthSum.pending!==1?'s':''} (${euros(monthSum.openRaw)} non pondérés).</div>
       <details class="mfr-sub"><summary>Détail et ratios du mois par commercial</summary>
-        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires</th><th>Prévision brute</th><th>CA signé</th><th>Non signé brut</th><th>Non signé pondéré</th><th>Estimation</th><th>Affaires validées à date</th></tr></thead>
-          <tbody>${monthlyRows||'<tr><td colspan="8">Aucun vendeur.</td></tr>'}</tbody></table></div>
+        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires</th><th>Prévision brute</th><th>CA signé</th><th>Non signé brut</th><th>Non signé pondéré</th><th>Estimation</th><th>Affaires validées à date</th><th>Fiabilité S+1 historisée</th></tr></thead>
+          <tbody>${monthlyRows||'<tr><td colspan="9">Aucun vendeur.</td></tr>'}</tbody></table></div>
         <p class="mfr-note">« Affaires validées à date » mesure l'avancement du mois, pas la fiabilité historique du commercial.</p>
       </details>
       <div class="mfr-actions">
@@ -197,10 +218,10 @@
         <div class="mfr-kpi"><small>Coefficient de pondération</small><b>${weekSum.gross?Math.round(weekSum.expected/weekSum.gross*100)+' %':'—'}</b></div>
         <div class="mfr-kpi"><small>Historique de fiabilité</small><b>${atLeast4?'Consultable ci-dessous':'Insuffisant'}</b></div>
       </div>
-      <div class="mfr-note">La prévision pondérée S+1 n'est pas une garantie de signature : elle repose uniquement sur les probabilités saisies. Une correction statistique par vendeur sera possible après plusieurs semaines de prévisions figées et comparables au réalisé.</div>
+      <div class="mfr-note">La prévision pondérée S+1 n'est pas une garantie de signature : elle repose uniquement sur les probabilités saisies. Les ratios historiques par vendeur apparaîtront après au moins quatre semaines S+1 figées, terminées et comparables.</div>
       <details class="mfr-sub"><summary>Détail des prévisions S+1 par commercial</summary>
-        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires S+1</th><th>Prévision brute</th><th>Montant pondéré</th><th>Pondération moyenne</th></tr></thead>
-          <tbody>${weeklyRows||'<tr><td colspan="5">Aucun vendeur.</td></tr>'}</tbody></table></div>
+        <div class="mfr-scroll"><table><thead><tr><th>Commercial</th><th>Affaires S+1</th><th>Prévision brute</th><th>Montant pondéré</th><th>Pondération moyenne</th><th>Fiabilité S+1 historisée</th></tr></thead>
+          <tbody>${weeklyRows||'<tr><td colspan="6">Aucun vendeur.</td></tr>'}</tbody></table></div>
       </details>
       <div class="mfr-actions">
         <button class="mfr-primary" data-save="week" type="button" ${weekSum.count&&!working?'':'disabled'}>Figer ma prévision S+1</button>
@@ -211,7 +232,7 @@
       ${hist.length?`<div class="mfr-scroll"><table><thead><tr><th>Période</th><th>Début</th><th>Annonce figée</th><th>CA réellement signé</th><th>Réalisé / annoncé</th><th>Écart</th></tr></thead>
         <tbody>${snapRows}</tbody></table></div>`:
         '<p class="mfr-no-history">Pas encore de période terminée avec une prévision figée. Les ratios de fiabilité réels apparaîtront une fois les annonces et leurs résultats disponibles.</p>'}
-      <div class="mfr-warn">Données historiques encore limitées : le mois de septembre ne dispose pas des signatures complètes dans le Prévisionnel mois. Les pourcentages actuels par vendeur sont des indicateurs d'avancement, <b>pas des coefficients fiables pour corriger leurs annonces</b>. Il faut plusieurs périodes clôturées pour mesurer les écarts réellement.</div>
+      <div class="mfr-warn">Les données antérieures aux premières prévisions figées peuvent être incomplètes. Les pourcentages « affaires validées » indiquent l'avancement du mois, <b>pas une performance définitive</b>. Les coefficients historiques nécessitent au moins quatre semaines clôturées et correctement renseignées.</div>
       ${changeStatus?`<p class="mfr-error">${escape(changeStatus)}</p>`:''}
       <p id="mfrFeedback" class="${error?'mfr-error':'mfr-ok'}" role="status">${escape(error||message)}</p>
       <p class="mfr-note">Dernière actualisation : ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}. Le gel de prévision enregistre une photo privée de ton annonce ; il ne change aucune donnée de vente.</p>`;
@@ -222,6 +243,8 @@
     box.querySelector('#mfrRefresh').onclick=()=>load();
     box.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy,monthSum,weekSum,sellers));
     box.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>freeze(b.dataset.save,monthSum,weekSum,sellers));
+    [...box.querySelectorAll('details.mfr-sub')].forEach((el,i)=>{el.open=!!expandedDetails[i]});
+    lastSignature=signature;
   }
   function copyText(kind,m,w,people){
     if(kind==='month'){
