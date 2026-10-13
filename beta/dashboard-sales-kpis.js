@@ -41,7 +41,11 @@
     }
     placeFirst();return box
   }
-  function card(label,done,target){const p=pct(done,target),r=remain(target,done);return `<div class="dsk-kpi"><div class="dsk-label">${label}</div><div class="dsk-value">${fmt(done)} / ${fmt(target)}</div><div class="dsk-meta">Reste à faire : <span class="dsk-remain">${fmt(r)}</span> · ${p}% atteint</div><div class="dsk-bar"><i style="width:${Math.min(100,p)}%"></i></div></div>`}
+  function card(label,done,target){
+    if(target==null)return `<div class="dsk-kpi"><div class="dsk-label">${label}</div><div class="dsk-value">${fmt(done)} / —</div><div class="dsk-meta">Objectif individuel non renseigné</div><div class="dsk-bar"></div></div>`;
+    const p=pct(done,target),r=remain(target,done);
+    return `<div class="dsk-kpi"><div class="dsk-label">${label}</div><div class="dsk-value">${fmt(done)} / ${fmt(target)}</div><div class="dsk-meta">Reste à faire : <span class="dsk-remain">${fmt(r)}</span> · ${p}% atteint</div><div class="dsk-bar"><i style="width:${Math.min(100,p)}%"></i></div></div>`;
+  }
   function render(box,title,sub,done,target){
     const sig=[title,sub,done.ca,done.nc,done.upcross,target.ca_target,target.nc_target,target.upcross_target].join('|');if(sig===lastSig&&box.querySelector('.dsk-grid'))return;lastSig=sig;
     box.innerHTML=`<div class="dsk-head"><div><h3>🏢 ${title}</h3><small>${sub}</small></div><button id="dskRefresh" class="dsk-refresh" type="button">Actualiser</button></div><div class="dsk-grid">${card('CA',done.ca,target.ca_target)}${card('NC',done.nc,target.nc_target)}${card('UP/CROSS',done.upcross,target.upcross_target)}</div>`;
@@ -66,20 +70,36 @@
         if(tr.error)throw tr.error;if(mr.error)throw mr.error;
         render(box,'Agence',`Cumul de tous les secteurs · ${fyLabel(fy)} · avril ${fy} → mars ${fy+1}`,totals(mr.data||[]),tr.data||{ca_target:0,nc_target:0,upcross_target:0});
       }else{
-        const fresh=await latestOwnProfile(client,u,p),sec=Number(fresh?.sector_id||0);
-        if(!sec){box.innerHTML='<div class="dsk-error">Aucun secteur ne t’est affecté pour le moment.</div>';return}
+        // L'objectif appartient au commercial, jamais à son secteur.
+        // Les seules réalisations individuelles disponibles ici sont les
+        // signatures CRM : elles ne doivent pas se faire passer pour l'intégralité
+        // du CA fiscal officiel de l'exercice.
+        const fresh=await latestOwnProfile(client,u,p);
         const [tr,mr]=await Promise.all([
-          client.from('sector_sales_targets').select('ca_target,nc_target,upcross_target').eq('fiscal_start_year',fy).eq('sector_id',sec).maybeSingle(),
-          client.from('sector_monthly_sales').select('ca,nc,upcross').eq('fiscal_start_year',fy).eq('sector_id',sec)
+          client.from('seller_sales_targets').select('ca_target,nc_target,upcross_target')
+            .eq('fiscal_start_year',fy).eq('user_id',u.id).maybeSingle(),
+          client.from('monthly_forecasts').select('signed_amount_eur,client_type,sale_type')
+            .eq('user_id',u.id).eq('sale_completed',true)
+            .gte('signature_date',fy+'-04-01').lt('signature_date',(fy+1)+'-04-01')
         ]);
         if(tr.error)throw tr.error;if(mr.error)throw mr.error;
-        const name=fresh?.display_name||p?.display_name||'Vendeur';
-        render(box,`Mes chiffres — Secteur ${sec}`,`${name} · ${fyLabel(fy)} · objectif du secteur`,totals(mr.data||[]),tr.data||{ca_target:0,nc_target:0,upcross_target:0});
+        const done={ca:0,nc:0,upcross:0};
+        for(const deal of mr.data||[]){
+          const amount=Math.round(Number(deal.signed_amount_eur||0)*100)/100/1000;
+          done.ca+=amount;
+          if(deal.client_type==='nouveau')done.nc+=amount;
+          if(deal.client_type==='acquis'&&['up_sell','cross_sell'].includes(deal.sale_type))done.upcross+=amount;
+        }
+        const name=fresh?.display_name||p?.display_name||'Commercial';
+        const target=tr.data||{ca_target:null,nc_target:null,upcross_target:null};
+        render(box,'Mes objectifs — '+name,fyLabel(fy)+' · Objectifs individuels · Réalisé CRM signé seulement (suivi partiel, non officiel)',done,target);
       }
     }catch(e){box.innerHTML=`<div class="dsk-error">Impossible de charger les chiffres : ${String(e?.message||e).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`}finally{busy=false;placeFirst()}
   }
 
   function boot(){const box=ensureBox(),p=getProfile(),u=getUser();if(box&&p&&u){load();return true}return false}
   document.addEventListener('click',e=>{if(e.target?.closest?.('button[data-page="dashboard"]'))setTimeout(()=>load(true),120)});
+  window.addEventListener('rex:fiscal-targets-synced',()=>load(true));
+  window.addEventListener('rex:monthly-sale-synced',()=>load(true));
   let tries=0;const t=setInterval(()=>{tries++;if(boot()||tries>120)clearInterval(t)},500);window.addEventListener('load',()=>setTimeout(boot,1200));
 })();
