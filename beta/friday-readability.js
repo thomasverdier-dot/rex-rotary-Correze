@@ -84,6 +84,7 @@
    const id=uid(card,i),body=card.querySelector(':scope > .fp-body');if(!body)return;
    info(card);
    let tabs=body.querySelector(':scope > .fp-tabs');
+   if(tabs&&tabs.querySelector('[data-view="actions"]')){tabs.remove();tabs=null;}
    if(!tabs){
     tabs=document.createElement('div');tabs.className='fp-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Rubriques du Point vendredi');
     for(const [k,label] of [['activity','Activité'],['sales','Ventes réalisées'],['forecast','Prév. S+1'],['comment','Commentaire'],['report','Compte rendu']]){
