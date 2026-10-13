@@ -197,8 +197,8 @@
     subscribedFor=key;
     const filter=p.role==='admin'?{}:{filter:'user_id=eq.'+u.id};
     channel=client.channel('rex-live-sales-'+u.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'monthly_forecasts',...filter},()=>load())
-      .on('postgres_changes',{event:'*',schema:'public',table:'weekly_forecasts',...filter},()=>load());
+      .on('postgres_changes',{event:'*',schema:'public',table:'monthly_forecasts',...filter},()=>{load();window.dispatchEvent(new Event('rex:commercial-data-changed'))})
+      .on('postgres_changes',{event:'*',schema:'public',table:'weekly_forecasts',...filter},()=>{load();window.dispatchEvent(new Event('rex:commercial-data-changed'))});
     channel.subscribe();
   }
   function start(){
