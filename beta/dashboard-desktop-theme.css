@@ -198,3 +198,70 @@
   .rex-page[data-page="dashboard"] .rxh-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .rex-page[data-page="dashboard"] .rxh-kpi strong{font-size:18px}
 }
+
+/* Cumul glissant 12 mois — tableau de bord responsable ordinateur */
+.rex-page[data-page="dashboard"] .rxh-rolling {
+  background:linear-gradient(180deg,#fbfdff 0%,#ffffff 130px);
+  border-color:#d5e4f2;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling .rxh-panel-head{align-items:flex-end}
+.rex-page[data-page="dashboard"] .rxh-rolling .rxh-panel-head h4{font-size:17px;color:#123f70}
+.rex-page[data-page="dashboard"] .rxh-rolling .rxh-small-controls select{min-width:125px}
+.rex-page[data-page="dashboard"] .rxh-rolling .rxh-small-controls #rxh12View{min-width:210px}
+.rex-page[data-page="dashboard"] .rxh-rolling-summary{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+  margin:14px 0 10px;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-summary>div{
+  background:#fff;
+  border:1px solid #dce8f5;
+  border-radius:10px;
+  padding:13px 12px;
+  min-width:0;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-summary small{
+  display:block;
+  color:#637891;
+  font-size:11px;
+  font-weight:650;
+  line-height:1.4;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-summary strong{
+  display:block;
+  font-size:20px;
+  letter-spacing:-.4px;
+  color:#154676;
+  margin:7px 0 4px;
+  font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-status {
+  color:#5e7087;
+  font-size:11px;
+  line-height:1.6;
+  background:#eff6fe;
+  border:1px solid #e1eaf7;
+  padding:8px 10px;
+  border-radius:7px;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-chart {
+  min-height:155px;
+  margin:13px 0 15px;
+  padding-bottom:3px;
+}
+.rex-page[data-page="dashboard"] .rxh-rolling-chart .rxh-bars{height:125px}
+.rex-page[data-page="dashboard"] .rxh-rolling-chart .rxh-chart-col{gap:6px}
+.rex-page[data-page="dashboard"] .rxh-rolling-chart .rxh-chart-col small{white-space:nowrap}
+.rex-page[data-page="dashboard"] .rxh-mini-year{color:#a0acbd}
+.rex-page[data-page="dashboard"] .rxh-rolling-table{min-width:1080px;margin:5px 0}
+.rex-page[data-page="dashboard"] .rxh-rolling-table tbody th{font-size:11px}
+.rex-page[data-page="dashboard"] .rxh-rolling-table th:last-child,
+.rex-page[data-page="dashboard"] .rxh-rolling-table td:last-child{text-align:left;color:#697d94;font-size:10px}
+.rex-page[data-page="dashboard"] .rxh-rolling-table td:nth-child(5),
+.rex-page[data-page="dashboard"] .rxh-rolling-table td:nth-child(6),
+.rex-page[data-page="dashboard"] .rxh-rolling-table td:nth-child(7){font-weight:800;color:#214f7d}
+@media(max-width:1450px){
+  .rex-page[data-page="dashboard"] .rxh-rolling-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
