@@ -10,6 +10,28 @@
   const z=x=>String(x).padStart(2,'0');
   const dateISO=(y,m)=>y+'-'+z(m)+'-01';
   const selectISO=(y,m)=>y+'-'+z(m);
+  const fiscalStart=(y,m)=>m>=4?y:y-1;
+  const yearLabel=fy=>'FY'+String(fy).slice(-2)+'-'+String(fy+1).slice(-2);
+  const centsFromK=x=>Math.round(Number(x||0)*100000);
+  function goalProgress(monthly,goal,fy,untilYear,untilMonth){
+    const cutoff=selectISO(untilYear,untilMonth),from=selectISO(fy,4);
+    const selected=monthly.filter(x=>selectISO(x.year,x.month)>=from&&selectISO(x.year,x.month)<=cutoff);
+    const entered=selected.filter(x=>!!x.values);
+    const totals=entered.length?{
+      ca:entered.reduce((a,x)=>a+x.values.ca,0),
+      nc:entered.reduce((a,x)=>a+x.values.nc,0),
+      uc:entered.reduce((a,x)=>a+x.values.uc,0)
+    }:null;
+    const targets=goal?{
+      ca:centsFromK(goal.ca_target),
+      nc:centsFromK(goal.nc_target),
+      uc:centsFromK(goal.upcross_target)
+    }:null;
+    const ca=totals?.ca??null,target=targets?.ca??null;
+    return {fy,expected:selected.length,count:entered.length,totals,targets,
+      ratio:ca!==null&&target>0?ca/target*100:null,
+      remaining:ca!==null&&target!==null?Math.max(0,target-ca):null};
+  }
   const monthsFor=(y,m)=>Array.from({length:12},(_,i)=>{
     const d=new Date(y,m-12+i,15,12);
     return {year:d.getFullYear(),month:d.getMonth()+1,key:dateISO(d.getFullYear(),d.getMonth()+1)};
@@ -22,7 +44,7 @@
   const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
   const section=()=>document.getElementById(ID);
   let year=current.getFullYear(),month=current.getMonth()+1,rows=[],loading=false,queue=false,editing=false,saving=false,
-    metric='ca',showExtras=false,message='',messageType='ok',lastRequest=0,started=false,debounce=null,lastMarkup='';
+    metric='ca',showExtras=false,message='',messageType='ok',annualGoal=null,annualGoalError='',lastRequest=0,started=false,debounce=null,lastMarkup='';
 
   function parseEuro(value){
     const raw=String(value??'').trim().replace(/[\s\u00a0\u202f]/g,'').replace(',','.');
@@ -66,8 +88,10 @@
   function render(){
     const el=mount();if(!el)return;
     const result=buildPeriod(rows,year,month),selected=selectISO(year,month);
+    const fiscal=fiscalStart(year,month),annual=goalProgress(result.monthly,annualGoal,fiscal,year,month);
+    const percentage=annual.ratio==null?'—':new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(annual.ratio)+' %';
     const max=Math.max(1,...result.monthly.map(x=>x.values?.[metric]??0));
-    const signature=JSON.stringify([rows,year,month,metric,editing,saving,showExtras,message,messageType]);
+    const signature=JSON.stringify([rows,year,month,metric,editing,saving,showExtras,message,messageType,annualGoal,annualGoalError]);
     if(signature===lastMarkup&&el.querySelector('#rxAgencyMonth'))return;
     const label=k=>({ca:'CA',nc:'NC',uc:'UC'}[k]);
     const tableRows=result.monthly.map(item=>{
@@ -94,6 +118,26 @@
       '<h3>Résultats globaux sur 12 mois</h3><p>CA, NC et UC renseignés par toi, sans dépendance aux vendeurs et à leurs changements de secteur.</p></div>'+
       '<div class="rxag-filters"><label for="rxAgencyMonth">Dernier mois</label><input type="month" id="rxAgencyMonth" max="'+maxMonth+
       '" value="'+selected+'"><button type="button" id="rxAgencyReload">↻ Actualiser</button></div></div>'+
+      '<section class="rxag-goal" aria-label="Avancement de l’objectif annuel agence">'+
+        '<div class="rxag-goal-head"><div><h4>🎯 Objectif annuel d’agence · '+yearLabel(fiscal)+'</h4>'+
+          '<p>Exercice avril '+fiscal+' → mars '+(fiscal+1)+' · résultats globaux saisis par toi.</p></div>'+
+          '<span class="rxag-goal-period">'+annual.count+'/'+annual.expected+' mois saisis à date</span></div>'+
+        '<div class="rxag-goal-metrics">'+
+          '<div><small>Objectif annuel CA</small><strong>'+format(annual.targets?.ca??null)+'</strong></div>'+
+          '<div><small>CA réalisé déclaré</small><strong>'+format(annual.totals?.ca??null)+'</strong></div>'+
+          '<div><small>Objectif atteint</small><strong>'+percentage+'</strong></div>'+
+          '<div><small>Reste à réaliser</small><strong>'+format(annual.remaining)+'</strong></div>'+
+        '</div>'+
+        '<div class="rxag-goal-track" role="progressbar" aria-label="Progression vers l’objectif annuel" aria-valuemin="0" aria-valuemax="100"'+
+          (annual.ratio==null?'':' aria-valuenow="'+Math.min(100,Math.max(0,Math.round(annual.ratio)))+'"')+'>'+
+          '<span style="width:'+(annual.ratio==null?0:Math.min(100,Math.max(0,annual.ratio)))+'%"></span></div>'+
+        '<div class="rxag-goal-foot">'+
+          (annualGoalError?'<span class="rxag-goal-error">'+esc(annualGoalError)+'</span>':
+            (!annual.targets?'<span>Objectif non renseigné pour cet exercice dans Suivi CA fiscal.</span>':
+              (!annual.count?'<span>Le CA global de l’exercice n’a pas encore été renseigné : progression indisponible.</span>':
+                '<span>Avancement sur les mois déclarés'+(annual.count<annual.expected?' (suivi partiel)':'')+'.</span>')))+
+          (annual.targets?'<span>Objectif NC : '+format(annual.targets.nc)+' · Objectif UC : '+format(annual.targets.uc)+'</span>':'')+
+        '</div></section>'+
       '<div class="rxag-kpis">'+metrics().map(k=>'<div class="rxag-kpi"><small>'+label(k)+' cumulé</small><strong>'+
         format(final?.[k]??null)+'</strong><span>'+result.count+'/12 mois renseignés</span></div>').join('')+'</div>'+
       '<div class="rxag-status"><strong>'+result.count+'/12 mois renseignés</strong> · '+(result.complete?
@@ -214,12 +258,20 @@
     loading=true;lastRequest=Date.now();
     const requestMonth=selectISO(year,month),range=monthsFor(year,month);
     try{
-      const result=await db.from(TABLE).select('month_start,ca_cents,nc_cents,uc_cents,updated_at')
-        .eq('manager_user_id',u.id).gte('month_start',range[0].key).lte('month_start',range[11].key)
-        .order('month_start');
+      const fy=fiscalStart(year,month);
+      const [result,goalResult]=await Promise.all([
+        db.from(TABLE).select('month_start,ca_cents,nc_cents,uc_cents,updated_at')
+          .eq('manager_user_id',u.id).gte('month_start',range[0].key).lte('month_start',range[11].key)
+          .order('month_start'),
+        db.from('agency_sales_targets').select('fiscal_start_year,ca_target,nc_target,upcross_target')
+          .eq('fiscal_start_year',fy).maybeSingle()
+      ]);
       if(result.error)throw result.error;
       if(selectISO(year,month)!==requestMonth){queue=true;return}
-      rows=result.data||[];lastMarkup='';if(messageType==='error'){message='';messageType='ok'}render();
+      rows=result.data||[];
+      annualGoal=goalResult.error?null:(goalResult.data||null);
+      annualGoalError=goalResult.error?'Objectif annuel indisponible : '+goalResult.error.message:'';
+      lastMarkup='';if(messageType==='error'){message='';messageType='ok'}render();
     }catch(error){notice('Erreur de chargement des résultats agence : '+(error?.message||error),'error');render()}
     finally{loading=false;if(queue){queue=false;load()}}
   }
