@@ -96,39 +96,51 @@
     return value>0?'↗ +'+pct+' %':value<0?'↘ −'+pct+' %':'→ 0,0 %';
   }
   function cumulativeArrowChart(monthly){
-    const W=1200,H=297,left=77,right=66,top=37,bottom=246;
-    const width=W-left-right,height=bottom-top;
-    const entries=monthly.map((m,index)=>({m,index})).filter(v=>v.m.values!==null);
+    const W=Math.max(1200,monthly.length*84+100),H=297,left=77,right=66,top=37,bottom=246;
+    const plotWidth=W-left-right,height=bottom-top;
+    const spacing=monthly.length>1?plotWidth/(monthly.length-1):0;
+    const x=i=>Math.round((left+i*spacing)*100)/100;
+    const y=(v,ceiling)=>Math.round((bottom-v/ceiling*height)*100)/100;
+    const fmtMonth=m=>MONTHS[m.month-1]+' '+m.year;
+    const entries=monthly.map((m,index)=>({m,index})).filter(p=>p.m.values!==null);
     const trends=monthlyCATrends(monthly);
     const trendItems=monthly.map((m,i)=>{
       const t=trends[i],cls=t==null?'missing':t>0?'up':t<0?'down':'steady';
-      let title='Évolution indisponible : premier mois, mois absent ou CA précédent nul.';
-      if(t!=null)title=MONTHS[m.month-1]+' '+m.year+' : '+trendLabel(t)+' de CA mensuel par rapport à '+MONTHS[monthly[i-1].month-1]+'.';
-      return '<div class="rxag-trend-item '+cls+'" title="'+esc(title)+'">'+
+      let tooltip='Évolution indisponible : premier mois, mois absent ou CA précédent nul.';
+      if(t!=null)tooltip=fmtMonth(m)+' : '+trendLabel(t)+' de CA mensuel par rapport à '+fmtMonth(monthly[i-1])+'.';
+      return '<div class="rxag-trend-item '+cls+'" title="'+esc(tooltip)+'">'+
         '<span class="rxag-trend-value">'+esc(trendLabel(t))+'</span></div>';
     }).join('');
+    const trendStart=Math.max(0,left-spacing/2),trendWidth=Math.max(0,spacing*monthly.length);
+    const trendStyle='grid-template-columns:repeat('+monthly.length+',minmax(0,1fr));'+
+      'margin-left:'+trendStart.toFixed(2)+'px;width:'+trendWidth.toFixed(2)+'px;padding:0;';
     if(!entries.length)return {
-      svg:'<div class="rxag-cum-empty">Aucun CA global renseigné pour cette période. La courbe se construira lors de tes saisies.</div>',
-      trends:'',latest:null,monthTrend:null,recorded:0,gaps:monthly.length
+      svg:'<div class="rxag-cum-empty">Aucun chiffre d’agence renseigné sur cette période. Complète les mois historiques en k€ pour construire la courbe.</div>',
+      trends:'',latest:null,monthTrend:null,recorded:0,gaps:monthly.length,
+      width:W,trendStyle,lastIndex:-1
     };
-    const highest=Math.max(1,...entries.map(e=>e.m.cumulative.ca)),ceiling=highest*1.12;
-    const x=i=>Math.round((left+i*width/11)*100)/100;
-    const y=v=>Math.round((bottom-v/ceiling*height)*100)/100;
-    const pts=entries.map(e=>({x:x(e.index),y:y(e.m.cumulative.ca),index:e.index,m:e.m}));
+    const maximum=Math.max(1,...entries.map(e=>e.m.cumulative.ca)),ceiling=maximum*1.12;
+    const points=entries.map(e=>({
+      x:x(e.index),y:y(e.m.cumulative.ca,ceiling),index:e.index,m:e.m
+    }));
     const curve=(a,b)=>{
       const dx=b.x-a.x;
       return 'M '+a.x+' '+a.y+' C '+(a.x+dx*.37).toFixed(2)+' '+a.y+
         ' '+(b.x-dx*.37).toFixed(2)+' '+b.y+' '+b.x+' '+b.y;
     };
     const grid=[0,.5,1].map(frac=>{
-      const yGrid=Math.round((bottom-frac*height)*100)/100;
-      return '<line class="rxag-cum-grid" x1="'+left+'" y1="'+yGrid+'" x2="'+(W-right)+'" y2="'+yGrid+'"/>'+
-        '<text class="rxag-cum-y" x="'+(left-12)+'" y="'+(yGrid+4)+'" text-anchor="end">'+
+      const posY=Math.round((bottom-frac*height)*100)/100;
+      return '<line class="rxag-cum-grid" x1="'+left+'" y1="'+posY+'" x2="'+(W-right)+'" y2="'+posY+'"/>'+
+        '<text class="rxag-cum-y" x="'+(left-12)+'" y="'+(posY+4)+'" text-anchor="end">'+
         esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(ceiling*frac/100000))+'</text>';
     }).join('');
+    const yearBoundaries=monthly.map((m,i)=>m.month===1&&i>0?'<line class="rxag-cum-year-line" x1="'+(x(i)-spacing/2).toFixed(2)+
+      '" y1="'+top+'" x2="'+(x(i)-spacing/2).toFixed(2)+'" y2="'+bottom+'"/>':'').join('');
     const groups=[];let contiguous=[];
-    pts.forEach(p=>{
-      if(contiguous.length&&p.index!==contiguous[contiguous.length-1].index+1){groups.push(contiguous);contiguous=[]}
+    points.forEach(p=>{
+      if(contiguous.length&&p.index!==contiguous[contiguous.length-1].index+1){
+        groups.push(contiguous);contiguous=[];
+      }
       contiguous.push(p);
     });
     if(contiguous.length)groups.push(contiguous);
@@ -137,16 +149,15 @@
       return '<path class="rxag-cum-area" d="M '+group[0].x+' '+bottom+' L '+group[0].x+' '+group[0].y+' '+
         steps+' L '+group[group.length-1].x+' '+bottom+' Z"/>';
     }).join('');
-    const links=pts.slice(1).map((p,i)=>{
-      const prior=pts[i],gap=p.index!==prior.index+1,last=i===pts.length-2;
-      return '<path class="'+(gap?'rxag-cum-dashed':'rxag-cum-line')+'" d="'+curve(prior,p)+'"'+
+    const lines=points.slice(1).map((p,i)=>{
+      const prev=points[i],gap=p.index!==prev.index+1,last=i===points.length-2;
+      return '<path class="'+(gap?'rxag-cum-dashed':'rxag-cum-line')+'" d="'+curve(prev,p)+'"'+
         (last?' marker-end="url(#rxagArrowhead)"':'')+'/>';
     }).join('');
-    const circles=pts.map((p,i)=>{
-      const last=i===pts.length-1;
-      const trend=trends[p.index];
-      const tip=MONTHS[p.m.month-1]+' '+p.m.year+' · CA cumulé '+format(p.m.cumulative.ca)+
-        ' · CA mensuel '+format(p.m.values.ca)+' · Variation du CA mensuel : '+trendLabel(trend);
+    const circles=points.map((p,i)=>{
+      const last=i===points.length-1,trend=trends[p.index];
+      const tip=fmtMonth(p.m)+' · CA cumulé '+format(p.m.cumulative.ca)+
+        ' · CA mensuel '+format(p.m.values.ca)+' · Évolution M-1 : '+trendLabel(trend);
       return '<circle class="'+(last?'rxag-cum-dot rxag-cum-latest':'rxag-cum-dot')+
         '" cx="'+p.x+'" cy="'+p.y+'" r="'+(last?7:4.8)+'"><title>'+esc(tip)+'</title></circle>';
     }).join('');
@@ -155,12 +166,12 @@
       '" x="'+x(i)+'" y="'+(bottom+27)+'" text-anchor="middle">'+
       esc(MONTHS[m.month-1].slice(0,3))+' '+String(m.year).slice(-2)+'</text>'
     ).join('');
-    const latest=pts[pts.length-1];
-    const monthTrend=trends[latest.index];
+    const latest=points[points.length-1],monthTrend=trends[latest.index];
     const svg='<svg class="rxag-cum-svg" viewBox="0 0 '+W+' '+H+
       '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+
-      esc('Courbe du CA cumulé sur douze mois en k€, dernier cumul '+format(latest.m.cumulative.ca)+
-        '. La variation mensuelle en pourcentage est présentée sous le graphique.')+
+      esc('Courbe du CA cumulé en k€, de '+fmtMonth(monthly[0])+' à '+fmtMonth(monthly[monthly.length-1])+
+        ', dernier cumul disponible '+format(latest.m.cumulative.ca)+
+        '. Évolution mensuelle en pourcentage sous la courbe.')+
       '" xmlns="http://www.w3.org/2000/svg">'+
       '<defs><linearGradient id="rxagCumulativeShade" x1="0" y1="0" x2="0" y2="1">'+
       '<stop offset="0%" stop-color="#2879c7" stop-opacity=".22"/>'+
@@ -168,9 +179,9 @@
       '<marker id="rxagArrowhead" viewBox="0 0 10 10" markerWidth="13" markerHeight="13" refX="9" refY="5" orient="auto">'+
       '<path d="M 0 0 L 9 5 L 0 10 z" fill="#1764aa"/></marker></defs>'+
       '<text class="rxag-cum-axis-title" x="'+left+'" y="18">CA CUMULÉ (k€)</text>'+
-      grid+areas+links+circles+dates+'</svg>';
+      grid+yearBoundaries+areas+lines+circles+dates+'</svg>';
     return {svg,trends:trendItems,latest:latest.m.cumulative.ca,monthTrend,recorded:entries.length,
-      gaps:monthly.length-entries.length};
+      gaps:monthly.length-entries.length,width:W,trendStyle,lastIndex:latest.index};
   }
 
   function mount(){
