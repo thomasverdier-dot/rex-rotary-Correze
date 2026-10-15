@@ -133,7 +133,15 @@
       if(editing&&el.querySelector('.rxag-table-wrap')?.dataset.dirty==='1'&&!confirm('Abandonner les chiffres non enregistrés ?'))return;
       editing=!editing;lastMarkup='';notice('');render();
     };
-    el.querySelector('#rxAgencyExtras').onclick=()=>{showExtras=!showExtras;page()?.classList.toggle('rxh-show-extras',showExtras);lastMarkup='';render()};
+    el.querySelector('#rxAgencyExtras').onclick=e=>{
+      // Changer la visibilité des analyses secondaires sans reconstruire le
+      // tableau : une saisie CA / NC / UC en cours reste intacte.
+      showExtras=!showExtras;
+      page()?.classList.toggle('rxh-show-extras',showExtras);
+      e.currentTarget.textContent=showExtras?'Masquer les analyses complémentaires':'Afficher les autres analyses (facultatif)';
+      e.currentTarget.setAttribute('aria-expanded',String(showExtras));
+      lastMarkup=''; // prochain rafraîchissement volontaire.
+    };
     if(editing){
       const wrap=el.querySelector('.rxag-table-wrap');
       wrap.addEventListener('input',()=>{wrap.dataset.dirty='1'});
