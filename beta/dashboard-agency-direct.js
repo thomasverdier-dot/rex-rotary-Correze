@@ -83,10 +83,13 @@
       return (m.values.ca-prev.values.ca)/prev.values.ca*100;
     });
   }
-  function annualCATrends(monthly){
-    return monthly.map((m,i)=>{
-      if(i<12||!m.values||!monthly[i-12].values||monthly[i-12].values.ca===0)return null;
-      return (m.values.ca-monthly[i-12].values.ca)/monthly[i-12].values.ca*100;
+  function annualCATrends(monthly,allRows=[]){
+    const historic=new Map(allRows.map(r=>[String(r.month_start).slice(0,10),Number(r.ca_cents)]));
+    return monthly.map(m=>{
+      if(!m.values)return null;
+      const previous=historic.get(dateISO(m.year-1,m.month));
+      if(previous==null||previous===0)return null;
+      return (m.values.ca-previous)/previous*100;
     });
   }
   function trendLabel(value){
@@ -213,7 +216,7 @@
     const signature=JSON.stringify([rows,year,month,viewRange,editing,saving,showExtras,message,messageType,annualGoal,annualGoalError]);
     if(signature===lastMarkup&&el.querySelector('#rxAgencyMonth'))return;
     const label=k=>({ca:'CA',nc:'NC',uc:'UC'}[k]);
-    const monthlyChanges=monthlyCATrends(result.monthly),annualChanges=annualCATrends(result.monthly);
+    const monthlyChanges=monthlyCATrends(result.monthly),annualChanges=annualCATrends(result.monthly,rows);
     const periodLabel=viewRange==='all'?'depuis juillet 2023':'sur les 12 derniers mois';
     const previousAvailable=chart.lastIndex>=0?annualChanges[chart.lastIndex]:null;
     const trendBadge=(trend)=>{
@@ -274,7 +277,8 @@
         '<span class="'+(chart.monthTrend==null?'neutral':chart.monthTrend>0?'up':chart.monthTrend<0?'down':'steady')+'">'+
           (chart.monthTrend==null?'Tendance mensuelle indisponible':trendLabel(chart.monthTrend)+' de CA mensuel')+
         '</span><span class="rxag-cum-yoy">Vs même mois N-1 : '+esc(trendLabel(previousAvailable))+'</span></div></div>'+
-      '<div class="rxag-cum-panel"><div class="rxag-cum-scroll"><div class="rxag-cum-track" style="width:'+chart.width+'px">'+chart.svg+
+      '<div class="rxag-cum-panel">'+(viewRange==='all'?'<div class="rxag-scroll-hint">← Fais défiler le graphique horizontalement pour remonter jusqu’en juillet 2023</div>':'')+
+        '<div class="rxag-cum-scroll"><div class="rxag-cum-track" style="width:'+chart.width+'px">'+chart.svg+
         (chart.trends?'<div class="rxag-trends" style="'+chart.trendStyle+'" aria-label="Évolution du CA mensuel en pourcentage">'+chart.trends+'</div>':'')+
       '</div></div></div>'+
       '<div class="rxag-cum-explanation">La courbe bleue représente le <b>CA cumulé</b> : elle monte même quand l’activité ralentit. '+
@@ -292,6 +296,10 @@
       '<div class="rxag-footer"><span>Tous les montants affichés sont en k€. Source : tes chiffres globaux ; aucune addition automatique des chiffres vendeurs ou secteurs.</span>'+
       '<button type="button" id="rxAgencyExtras" aria-expanded="'+String(showExtras)+'">'+
        (showExtras?'Masquer les analyses complémentaires':'Afficher les autres analyses (facultatif)')+'</button></div>';
+    const timeline=el.querySelector('.rxag-cum-scroll');
+    // La vue historique s'ouvre sur les mois les plus récents ; on peut
+    // toujours remonter jusqu'à juillet 2023 en faisant défiler à gauche.
+    if(timeline&&viewRange==='all')timeline.scrollLeft=timeline.scrollWidth;
     el.querySelector('#rxAgencyRange').onchange=e=>{
       const next=e.target.value;
       if(next!=='all'&&next!=='12')return;
@@ -398,7 +406,7 @@
       const fy=fiscalStart(year,month);
       const [result,goalResult]=await Promise.all([
         db.from(TABLE).select('month_start,ca_cents,nc_cents,uc_cents,updated_at')
-          .eq('manager_user_id',u.id).gte('month_start',range[0].key).lte('month_start',range[11].key)
+          .eq('manager_user_id',u.id).gte('month_start',HISTORY_START+'-01').lte('month_start',range[range.length-1].key)
           .order('month_start'),
         db.from('agency_sales_targets').select('fiscal_start_year,ca_target,nc_target,upcross_target')
           .eq('fiscal_start_year',fy).maybeSingle()
