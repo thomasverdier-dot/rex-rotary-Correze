@@ -538,3 +538,82 @@
   .rex-page[data-page="dashboard"] .rxag-trend-value{font-size:9px;padding:4px 2px}
   .rex-page[data-page="dashboard"] .rxag-cum-panel{padding:10px 7px 9px}
 }
+
+/* Historique global juillet 2023 -> mois sélectionné : desktop, graphique unique. */
+.rex-page[data-page="dashboard"] .rxag-filters select {
+  border:1px solid #d6e1ee;
+  border-radius:8px;
+  padding:9px 10px;
+  min-height:36px;
+  background:#fff;
+  color:#214467;
+  box-sizing:border-box;
+  font:700 12px Segoe UI,Arial,sans-serif;
+  cursor:pointer;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-panel{padding:12px 8px 10px}
+.rex-page[data-page="dashboard"] .rxag-cum-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  scrollbar-color:#aec8e3 #eff5fa;
+  scrollbar-width:thin;
+  padding-bottom:7px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-track{min-width:0;max-width:none}
+.rex-page[data-page="dashboard"] .rxag-cum-svg{
+  display:block;
+  width:100%;
+  height:297px;
+  max-height:none;
+  overflow:visible;
+}
+.rex-page[data-page="dashboard"] .rxag-trends{
+  display:grid;
+  max-width:none;
+  min-width:0;
+  align-items:center;
+  gap:0;
+}
+.rex-page[data-page="dashboard"] .rxag-trend-value{font-size:10px}
+.rex-page[data-page="dashboard"] .rxag-cum-year-line{
+  stroke:#c9ddef;
+  stroke-width:1.4;
+  stroke-dasharray:5 7;
+}
+.rex-page[data-page="dashboard"] .rxag-scroll-hint{
+  color:#6b839d;font-size:11px;line-height:1.5;
+  margin:1px 10px 8px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-yoy{
+  color:#58738d;
+  background:#edf4fc;
+}
+.rex-page[data-page="dashboard"] .rxag-table-wrap{
+  max-height:485px;
+  overflow:auto;
+  scrollbar-color:#aec8e3 #f1f6fc;
+}
+.rex-page[data-page="dashboard"] .rxag-table{min-width:1290px}
+.rex-page[data-page="dashboard"] .rxag-table thead th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  box-shadow:0 1px 0 #e0eaf3;
+}
+.rex-page[data-page="dashboard"] .rxag-table-trend{
+  display:inline-block;
+  font-size:11px;
+  font-weight:850;
+  font-variant-numeric:tabular-nums;
+}
+.rex-page[data-page="dashboard"] .rxag-table-trend.up{color:#168054}
+.rex-page[data-page="dashboard"] .rxag-table-trend.down{color:#be3d43}
+.rex-page[data-page="dashboard"] .rxag-table-trend.steady{color:#72859b}
+.rex-page[data-page="dashboard"] .rxag-table-trend.missing{color:#b0bac7}
+@media(max-width:1220px){
+  .rex-page[data-page="dashboard"] .rxag-cum-svg{height:297px}
+  .rex-page[data-page="dashboard"] .rxag-trend-value{font-size:10px}
+}
