@@ -447,3 +447,94 @@
   .rex-page[data-page="dashboard"] .rxag-goal-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .rex-page[data-page="dashboard"] .rxag-goal-metrics>div:nth-child(2){border-right:0}
 }
+
+/* CA cumulé : courbe avec flèche continue + tendance mensuelle % (desktop manager). */
+.rex-page[data-page="dashboard"] .rxag-cum-header{
+  align-items:center;
+  margin:22px 0 10px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-header h4{font-size:17px}
+.rex-page[data-page="dashboard"] .rxag-cum-header p{
+  color:#69809c;font-size:11px;line-height:1.5;margin:5px 0 0;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-summary{
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-summary strong{
+  font-size:22px;letter-spacing:-.35px;color:#194b81;white-space:nowrap;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-summary span{
+  display:inline-block;border-radius:99px;padding:5px 9px;
+  font-weight:800;font-size:11px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-summary .up{color:#14764d;background:#eaf8f1}
+.rex-page[data-page="dashboard"] .rxag-cum-summary .down{color:#b53b43;background:#fff0f1}
+.rex-page[data-page="dashboard"] .rxag-cum-summary .steady,
+.rex-page[data-page="dashboard"] .rxag-cum-summary .neutral{color:#59768c;background:#f0f5fa}
+.rex-page[data-page="dashboard"] .rxag-cum-panel{
+  border:1px solid #dfebf6;border-radius:12px;
+  background:linear-gradient(180deg,#fcfeff 0%,#f7fbff 75%,#fff 100%);
+  padding:15px 12px 12px;overflow:hidden;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-svg{
+  display:block;width:100%;height:auto;max-height:330px;
+  overflow:visible;
+  font-family:Segoe UI,Arial,sans-serif;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-axis-title{
+  fill:#64809d;font-size:13px;font-weight:800;letter-spacing:1.25px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-grid{
+  stroke:#e4edf6;stroke-width:1.2;stroke-dasharray:4 7;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-y{fill:#7c90a8;font-size:13px;font-weight:650}
+.rex-page[data-page="dashboard"] .rxag-cum-month{
+  fill:#5b7795;font-size:12.5px;font-weight:700;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-month-absent{fill:#aeb9c7}
+.rex-page[data-page="dashboard"] .rxag-cum-area{fill:url(#rxagCumulativeShade)}
+.rex-page[data-page="dashboard"] .rxag-cum-line{
+  fill:none;stroke:#1764aa;stroke-width:4.4;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-dashed{
+  fill:none;stroke:#8faac7;stroke-width:3.6;
+  stroke-dasharray:9 9;stroke-linecap:round;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-dot{
+  stroke:#1a6bb4;stroke-width:3;fill:white;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-latest{
+  fill:#1a6bb4;stroke:white;stroke-width:3;
+  filter:drop-shadow(0 0 3px rgba(30,102,170,.22));
+}
+.rex-page[data-page="dashboard"] .rxag-trends{
+  display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;
+  padding:0 4.9% 0 5.75%;
+  box-sizing:border-box;align-items:center;
+}
+.rex-page[data-page="dashboard"] .rxag-trend-item{
+  text-align:center;min-width:0;white-space:nowrap;
+}
+.rex-page[data-page="dashboard"] .rxag-trend-value{
+  display:inline-block;font-size:10px;font-weight:800;
+  border-radius:6px;padding:5px 3px;
+  font-variant-numeric:tabular-nums;
+}
+.rex-page[data-page="dashboard"] .rxag-trend-item.up .rxag-trend-value{color:#168054;background:#eaf8f0}
+.rex-page[data-page="dashboard"] .rxag-trend-item.down .rxag-trend-value{color:#be3d43;background:#fff0f0}
+.rex-page[data-page="dashboard"] .rxag-trend-item.steady .rxag-trend-value{color:#6f8296;background:#edf3f8}
+.rex-page[data-page="dashboard"] .rxag-trend-item.missing .rxag-trend-value{color:#a8b6c4}
+.rex-page[data-page="dashboard"] .rxag-cum-explanation{
+  font-size:11px;color:#70849c;line-height:1.65;margin:9px 0 15px;
+}
+.rex-page[data-page="dashboard"] .rxag-cum-explanation b{color:#345e89}
+.rex-page[data-page="dashboard"] .rxag-cum-explanation span{color:#b17b3e}
+.rex-page[data-page="dashboard"] .rxag-cum-empty{
+  min-height:205px;display:flex;align-items:center;justify-content:center;
+  color:#7991a8;text-align:center;font-size:12px;
+}
+@media(max-width:1200px){
+  .rex-page[data-page="dashboard"] .rxag-trend-value{font-size:9px;padding:4px 2px}
+  .rex-page[data-page="dashboard"] .rxag-cum-panel{padding:10px 7px 9px}
+}
