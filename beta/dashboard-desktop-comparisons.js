@@ -17,7 +17,7 @@
  const isAdmin=()=>getProfile()?.role==='admin';
  const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
  const now=new Date();
- let year=now.getFullYear(),month=now.getMonth()+1,people=[],selectedSeller='',metric='ca',
+ let year=now.getFullYear(),month=now.getMonth()+1,people=[],selectedSeller='',metric='ca',rollingView='all',rollingMetric='ca',
      rows=[],sectorRows=[],sales=[],loaded=false,busy=false,pending=false,saving=false,lastFetch=0,timer=null,
      message='',messageType='',editorOpen=false,historyOpen=true,active=false,lastOutput='';
  function rowKey(uid,y,m){return `${uid}|${iso(y,m)}`}
@@ -47,6 +47,59 @@
      result.push({month:monthNum,sectors,ca:aggregate('ca'),nc:aggregate('nc'),upcross:aggregate('upcross')});
    }
    return result;
+ }
+ function rollingMonths(y,m){
+   return Array.from({length:12},(_,i)=>{
+     const d=new Date(y,m-1-11+i,15,12);
+     return {year:d.getFullYear(),month:d.getMonth()+1,period:iso(d.getFullYear(),d.getMonth()+1)};
+   });
+ }
+ function rollingAnalysis(y,m,view='all'){
+   const months=rollingMonths(y,m);
+   const fiscalMap=new Map();
+   for(const record of sectorRows){
+     const fy=Number(record.fiscal_start_year),mi=Number(record.month_index);
+     if(mi<1||mi>12)continue;
+     const yy=mi<=9?fy:fy+1,mm=mi<=9?mi+3:mi-9;
+     fiscalMap.set(Number(record.sector_id)+'|'+iso(yy,mm),record);
+   }
+   const individual=historyMap(rows);
+   const signed=signedMap(sales);
+   const sectorId=view.startsWith('sector:')?Number(view.split(':')[1]):null;
+   const sellerId=view.startsWith('seller:')?view.slice('seller:'.length):null;
+   const sourceName=sellerId?'Commercial · saisies individuelles ou signatures CRM':
+     sectorId?'Suivi CA fiscal · secteur '+sectorId:'Suivi CA fiscal · 4 secteurs';
+   const running={ca:0,nc:0,upcross:0};
+   let filled=0,fiscalCount=0,crmCount=0;
+   const monthly=months.map(date=>{
+     let values=null,source='Non renseigné',official=false;
+     if(sellerId){
+       const logged=individual.get(rowKey(sellerId,date.year,date.month));
+       const live=signed.get(rowKey(sellerId,date.year,date.month));
+       if(logged){
+         values={ca:kilo(logged.ca),nc:kilo(logged.nc),upcross:kilo(logged.upcross)};
+         source='Saisie individuelle';official=true;
+       }else if(live){
+         values={ca:live.ca,nc:live.nc,upcross:live.upcross};
+         source='Signatures CRM · partiel';crmCount++;
+       }
+     }else{
+       const sectorIds=sectorId?[sectorId]:[1,2,3,4];
+       const sectorRecords=sectorIds.map(sec=>fiscalMap.get(sec+'|'+date.period));
+       if(sectorRecords.every(Boolean)){
+         values={
+           ca:sectorRecords.reduce((total,r)=>total+kilo(r.ca),0),
+           nc:sectorRecords.reduce((total,r)=>total+kilo(r.nc),0),
+           upcross:sectorRecords.reduce((total,r)=>total+kilo(r.upcross),0)
+         };
+         source=sectorId?'Fiscal S'+sectorId:'Fiscal S1–S4';official=true;
+       }else if(sectorRecords.some(Boolean))source='Secteurs incomplets';
+     }
+     if(values){filled++;if(official)fiscalCount++;for(const k of Object.keys(running))running[k]+=values[k]}
+     return {...date,values,source,cumulative:{...running},filledToDate:filled};
+   });
+   const total=filled?{...running}:null;
+   return {monthly,total,filled,fiscalCount,crmCount,sourceName,complete:filled===12&&!crmCount,periodStart:months[0].period,periodEnd:months[11].period};
  }
  function signedMap(deals){
    const map=new Map();
@@ -147,12 +200,26 @@
         <td>${fmt(d.nc)}</td><td>${fmt(d.uc)}</td></tr>`).join('');
    const summary=`<tr class="rxh-total"><th>Agence Corrèze</th><td>${fmt(totCur)}</td><td>${fmt(totPrev)}</td><td>${fmt(totLast)}</td><td>${delta(totCur,totPrev)}</td><td>${delta(totCur,totLast)}</td>
         <td>${fmt(result.totals(year,month,'nc',result.actual))}</td><td>${fmt(result.totals(year,month,'upcross',result.actual))}</td></tr>`;
+   const rolling=rollingAnalysis(year,month,rollingView);
+   const rollingLabel=rollingMetric==='ca'?'CA':rollingMetric==='nc'?'NC':'UC';
+   const rollingValues=rolling.monthly.map(r=>r.values?.[rollingMetric]).filter(x=>x!=null);
+   const rollingMax=Math.max(1,...rollingValues);
+   const rollingRows=rolling.monthly.map(r=>`<tr>
+     <th scope="row">${safe(MONTHS[r.month-1])} ${r.year}</th>
+     <td>${fmt(r.values?.ca??null)}</td><td>${fmt(r.values?.nc??null)}</td><td>${fmt(r.values?.upcross??null)}</td>
+     <td>${r.filledToDate?fmt(r.cumulative.ca):'—'}</td><td>${r.filledToDate?fmt(r.cumulative.nc):'—'}</td><td>${r.filledToDate?fmt(r.cumulative.upcross):'—'}</td>
+     <td>${safe(r.source)}</td></tr>`).join('');
+   const rollingChoices=[
+     ['all','Agence · 4 secteurs'],
+     ...[1,2,3,4].map(sec=>['sector:'+sec,'Secteur '+sec]),
+     ...people.map(person=>['seller:'+person.user_id,(person.display_name||'Commercial')+' · CRM'])
+   ];
    const sectorHistory=sectorArchiveByMonth(sectorRows,historyYear);
    const fiscalRows=sectorHistory.map(r=>`<tr><th scope="row">${safe(MONTHS[r.month-1])}</th>
      ${r.sectors.map(row=>`<td>${row?fmt(kilo(row.ca)):'Non renseigné'}</td>`).join('')}
      <td><strong>${fmt(r.ca)}</strong></td><td>${fmt(r.nc)}</td><td>${fmt(r.upcross)}</td></tr>`).join('');
    const nonEntered=people.filter(p=>!hist.get(rowKey(p.user_id,historyYear,month))).length;
-   const output=JSON.stringify([year,month,people,data,rows,sectorRows,sales,metric,selectedSeller,editorOpen,historyOpen,message,messageType]);
+   const output=JSON.stringify([year,month,people,data,rows,sectorRows,sales,metric,selectedSeller,rollingView,rollingMetric,editorOpen,historyOpen,message,messageType]);
    if(lastOutput===output&&box.querySelector('#rxhMonth'))return;
    const layout=`<div class="rxh-heading">
       <div><div class="rxh-eyebrow">CRM REX-ROTARY CORRÈZE · VUE RESPONSABLE</div><h3>Analyse comparative des résultats</h3>
@@ -164,6 +231,40 @@
        <article class="rxh-kpi"><span>CA M-1 · ${safe(MONTHS[before.month-1])} ${before.year}</span><strong>${fmt(totPrev)}</strong><small>${delta(totCur,totPrev)} par rapport à M-1</small></article>
        <article class="rxh-kpi"><span>CA N-1 · ${safe(mlabel)} ${historyYear}</span><strong>${fmt(totLast)}</strong><small>${delta(totCur,totLast)} par rapport à N-1</small></article>
        <article class="rxh-kpi"><span>Écart € vs N-1</span><strong>${totCur==null||totLast==null?'—':fmt(totCur-totLast)}</strong><small>${totLast==null?`${nonEntered} vendeur(s) encore à renseigner`:'Comparaison des deux mêmes mois'}</small></article>
+     </div>
+     <div class="rxh-panel rxh-rolling">
+       <div class="rxh-panel-head">
+         <div><h4>📈 Cumul glissant sur 12 mois</h4>
+           <p>Du ${safe(MONTHS[rolling.monthly[0].month-1])} ${rolling.monthly[0].year} au ${safe(MONTHS[month-1])} ${year} · analyse CA, NC et UC mois par mois</p></div>
+         <div class="rxh-small-controls">
+           <label for="rxh12View">Analyse</label>
+           <select id="rxh12View">${rollingChoices.map(([value,label])=>`<option value="${safe(value)}" ${rollingView===value?'selected':''}>${safe(label)}</option>`).join('')}</select>
+           <label for="rxh12Metric">Graphique</label>
+           <select id="rxh12Metric"><option value="ca" ${rollingMetric==='ca'?'selected':''}>CA</option><option value="nc" ${rollingMetric==='nc'?'selected':''}>NC</option><option value="upcross" ${rollingMetric==='upcross'?'selected':''}>UC</option></select>
+         </div>
+       </div>
+       <div class="rxh-rolling-summary">
+         <div><small>CA cumulé ${rolling.filled}/12 mois</small><strong>${fmt(rolling.total?.ca??null)}</strong></div>
+         <div><small>NC cumulé ${rolling.filled}/12 mois</small><strong>${fmt(rolling.total?.nc??null)}</strong></div>
+         <div><small>UC cumulé ${rolling.filled}/12 mois</small><strong>${fmt(rolling.total?.upcross??null)}</strong></div>
+         <div><small>Couverture</small><strong>${rolling.filled}/12</strong><small>${rolling.complete?'12 mois complets':rolling.crmCount?'Signatures CRM partielles':'Période incomplète'}</small></div>
+       </div>
+       <div class="rxh-rolling-status">${safe(rolling.sourceName)} · les cumuls incluent exclusivement les mois renseignés. ${rolling.complete?'Douze mois disponibles.':'Cumul partiel, non assimilable à un exercice complet.'}</div>
+       <div class="rxh-chart rxh-rolling-chart" role="img" aria-label="Évolution ${rollingLabel} mois par mois sur douze mois">
+         ${rolling.monthly.map(r=>`<div class="rxh-chart-col"><div class="rxh-bars">
+           <span class="rxh-bar rxh-bar-current ${r.values?'':'rxh-no-data'}" title="${safe(MONTHS[r.month-1])} ${r.year} · ${rollingLabel} : ${fmt(r.values?.[rollingMetric]??null)}"
+             style="height:${r.values?Math.max(1,Math.round(r.values[rollingMetric]/rollingMax*100)):0}%"></span>
+           </div><small>${safe(MONTHS[r.month-1].slice(0,3))}<span class="rxh-mini-year"> ${String(r.year).slice(-2)}</span></small></div>`).join('')}
+       </div>
+       <div class="rxh-scroll"><table class="rxh-table rxh-rolling-table"><thead><tr>
+         <th>Mois</th><th>CA</th><th>NC</th><th>UC</th><th>Cumul CA</th><th>Cumul NC</th><th>Cumul UC</th><th>Origine</th>
+       </tr></thead><tbody>${rollingRows}
+         <tr class="rxh-total"><th>Cumul renseigné · ${rolling.filled}/12</th>
+           <td>${fmt(rolling.total?.ca??null)}</td><td>${fmt(rolling.total?.nc??null)}</td><td>${fmt(rolling.total?.upcross??null)}</td>
+           <td>${fmt(rolling.total?.ca??null)}</td><td>${fmt(rolling.total?.nc??null)}</td><td>${fmt(rolling.total?.upcross??null)}</td><td>${rolling.complete?'Complet':'Partiel'}</td>
+         </tr>
+       </tbody></table></div>
+       <p class="rxh-note">${rollingView.startsWith('seller:')?'Vue commerciale : les signatures CRM ne représentent que les affaires réellement saisies et validées ici. Les périodes non renseignées restent absentes du cumul, même si les objectifs individuels existent.':'Vue fiscale : chiffres issus du Suivi CA fiscal, par secteur. Les zéros saisis sont conservés ; les mois non renseignés ne sont pas assimilés à zéro. Les objectifs commerciaux individuels ne sont pas mélangés avec ces réalisations.'} Choisis un autre mois en haut du tableau de bord pour décaler les 12 mois.</p>
      </div>
      <div class="rxh-panel"><div class="rxh-panel-head"><div><h4>Performance des commerciaux</h4><p>Évolution CA individuel : mois actuel, M-1 et même mois l'année précédente</p></div></div>
      <div class="rxh-scroll"><table class="rxh-table"><thead><tr><th>Commercial</th><th>CA actuel</th><th>CA M-1</th><th>CA N-1</th><th>Vs M-1</th><th>Vs N-1</th><th>NC actuel</th><th>UC actuel</th></tr></thead><tbody>${dataRows}${summary}</tbody></table></div></div>
@@ -199,13 +300,25 @@
    box.innerHTML=layout;
    const monthInput=box.querySelector('#rxhMonth');
    monthInput.onchange=e=>{
-     if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Des chiffres historiques sont en cours de saisie. Changer de période sans les enregistrer ?')){
-       e.target.value=iso(year,month);return;
+     const form=box.querySelector('#rxhForm');
+     if(form?.dataset.dirty==='1'){
+       if(!confirm('Des chiffres historiques sont en cours de saisie. Changer de période sans les enregistrer ?')){
+         e.target.value=iso(year,month);return;
+       }
+       form.dataset.dirty='0'; // L'utilisateur a confirmé abandonner le brouillon.
      }
      const [y,m]=String(e.target.value).split('-').map(Number);
      if(y>=2020&&y<=2099&&m>=1&&m<=12){year=y;month=m;lastOutput='';load()}
    };
    box.querySelector('#rxhReload').onclick=()=>load();
+   box.querySelector('#rxh12View').onchange=e=>{
+     if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Une saisie historique est en cours. Changer la vue sans enregistrer ?')){e.target.value=rollingView;return}
+     rollingView=e.target.value;lastOutput='';draw();
+   };
+   box.querySelector('#rxh12Metric').onchange=e=>{
+     if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Une saisie historique est en cours. Changer le graphique sans enregistrer ?')){e.target.value=rollingMetric;return}
+     rollingMetric=e.target.value;lastOutput='';draw();
+   };
    box.querySelector('#rxhSeller').onchange=e=>{selectedSeller=e.target.value;lastOutput='';draw()};
    box.querySelector('#rxhMetric').onchange=e=>{metric=e.target.value;lastOutput='';draw()};
    box.querySelector('#rxhEntrySeller').onchange=e=>{if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Les modifications en cours ne sont pas enregistrées. Changer de vendeur ?')){e.target.value=selectedSeller;return}selectedSeller=e.target.value;lastOutput='';draw()};
@@ -269,11 +382,11 @@
      const [pr,sa,hi,sh]=await Promise.all([
        client.from('profiles').select('user_id,display_name,role,sector_id').eq('role','seller').order('sector_id'),
        client.from('monthly_forecasts').select('user_id,signature_date,signed_amount_eur,client_type,sale_type')
-         .eq('sale_completed',true).gte('signature_date',`${currentYear}-01-01`).lt('signature_date',`${currentYear+1}-01-01`),
+         .eq('sale_completed',true).gte('signature_date',`${currentYear-1}-01-01`).lt('signature_date',`${currentYear+1}-01-01`),
        client.from('seller_monthly_sales').select('fiscal_start_year,month_index,user_id,ca,nc,upcross,sector_id')
-         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',prevYear),
+         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',currentYear),
        client.from('sector_monthly_sales').select('fiscal_start_year,month_index,sector_id,ca,nc,upcross')
-         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',prevYear)
+         .gte('fiscal_start_year',prevYear-1).lte('fiscal_start_year',currentYear)
      ]);
      for(const v of [pr,sa,hi,sh])if(v.error)throw v.error;
      if(year!==currentYear){pending=true;return}
