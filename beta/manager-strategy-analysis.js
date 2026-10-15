@@ -42,7 +42,7 @@
     return match?'user:'+match.user_id:'former:'+identity(name);
   }
   const sum=(arr,field)=>arr.reduce((s,r)=>s+Number(r[field]||0),0);
-  const difference=(a,b)=>b>0?(a/b-1)*100:null;
+  const difference=(a,b)=>a!=null&&b!=null&&b>0?(a/b-1)*100:null;
   const status=x=>x==null?'rms-na':x<0?'rms-down':x>0?'rms-up':'rms-flat';
   function monthRange(from,n){const [yy,mm]=from.split('-').map(Number);return Array.from({length:n},(_,i)=>{
     const d=new Date(yy,mm-1+i,15,12);
@@ -330,9 +330,9 @@
     const current=pf();
     if(!current)return false;
     if(current.role!=='admin')return true;
-    if(!owner()||!db()||!page())return false;
+    if(!owner()||!db()||!page()||!page().querySelector('#rexHistoryComparison'))return false;
     if(initialized)return true;
-    initialized=true;root();return true;
+    root();initialized=true;return true;
   }
   window.addEventListener('focus',()=>{if(!initialized||!element()?.querySelector('.rms-accordion')?.open)return;
     if(Date.now()-lastLoad>120000&&!saveBusy){loaded[tab]=false;load()}
