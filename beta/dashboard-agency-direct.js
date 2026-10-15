@@ -76,11 +76,17 @@
 
   // Le cumul est nécessairement croissant ; la tendance en +/- % compare
   // le CA signé/déclaré du mois avec celui du mois précédent, jamais le cumul.
-  function monthlyCATrends(monthly){
+  function monthlyCATrends(monthly,allRows=[]){
+    const previousPeriods=new Map(allRows.map(r=>[String(r.month_start).slice(0,10),Number(r.ca_cents)]));
     return monthly.map((m,i)=>{
-      const prev=monthly[i-1];
-      if(!m.values||!prev?.values||prev.values.ca===0)return null;
-      return (m.values.ca-prev.values.ca)/prev.values.ca*100;
+      if(!m.values)return null;
+      let previous=monthly[i-1]?.values?.ca;
+      if(previous==null){
+        const priorDate=new Date(m.year,m.month-2,15,12);
+        previous=previousPeriods.get(dateISO(priorDate.getFullYear(),priorDate.getMonth()+1));
+      }
+      if(previous==null||previous===0)return null;
+      return (m.values.ca-previous)/previous*100;
     });
   }
   function annualCATrends(monthly,allRows=[]){
@@ -98,7 +104,7 @@
     const pct=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(rounded);
     return value>0?'↗ +'+pct+' %':value<0?'↘ −'+pct+' %':'→ 0,0 %';
   }
-  function cumulativeArrowChart(monthly){
+  function cumulativeArrowChart(monthly,allRows=[]){
     const W=Math.max(1200,monthly.length*84+100),H=297,left=77,right=66,top=37,bottom=246;
     const plotWidth=W-left-right,height=bottom-top;
     const spacing=monthly.length>1?plotWidth/(monthly.length-1):0;
@@ -106,7 +112,7 @@
     const y=(v,ceiling)=>Math.round((bottom-v/ceiling*height)*100)/100;
     const fmtMonth=m=>MONTHS[m.month-1]+' '+m.year;
     const entries=monthly.map((m,index)=>({m,index})).filter(p=>p.m.values!==null);
-    const trends=monthlyCATrends(monthly);
+    const trends=monthlyCATrends(monthly,allRows);
     const trendItems=monthly.map((m,i)=>{
       const t=trends[i],cls=t==null?'missing':t>0?'up':t<0?'down':'steady';
       let tooltip='Évolution indisponible : premier mois, mois absent ou CA précédent nul.';
@@ -212,11 +218,11 @@
     const result=buildPeriod(rows,year,month,viewRange),selected=selectISO(year,month);
     const fiscal=fiscalStart(year,month),annual=goalProgress(result.monthly,annualGoal,fiscal,year,month);
     const percentage=annual.ratio==null?'—':new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(annual.ratio)+' %';
-    const chart=cumulativeArrowChart(result.monthly);
+    const chart=cumulativeArrowChart(result.monthly,rows);
     const signature=JSON.stringify([rows,year,month,viewRange,editing,saving,showExtras,message,messageType,annualGoal,annualGoalError]);
     if(signature===lastMarkup&&el.querySelector('#rxAgencyMonth'))return;
     const label=k=>({ca:'CA',nc:'NC',uc:'UC'}[k]);
-    const monthlyChanges=monthlyCATrends(result.monthly),annualChanges=annualCATrends(result.monthly,rows);
+    const monthlyChanges=monthlyCATrends(result.monthly,rows),annualChanges=annualCATrends(result.monthly,rows);
     const periodLabel=viewRange==='all'?'depuis juillet 2023':'sur les 12 derniers mois';
     const previousAvailable=chart.lastIndex>=0?annualChanges[chart.lastIndex]:null;
     const trendBadge=(trend)=>{
