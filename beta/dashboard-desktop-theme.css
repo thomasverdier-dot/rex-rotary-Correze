@@ -391,3 +391,59 @@
   .rex-page[data-page="dashboard"] .rxag-kpi strong{font-size:20px}
   .rex-page[data-page="dashboard"] .rxag-kpis{gap:7px}
 }
+
+/* Objectif annuel fiscal CA — un seul bloc compact visible sur le tableau manager */
+.rex-page[data-page="dashboard"] .rxag-goal{
+  border:1px solid #d6e3f1;
+  border-radius:12px;
+  background:linear-gradient(110deg,#f7fbff,#ffffff 65%);
+  margin:19px 0 13px;
+  padding:17px 18px;
+  box-shadow:0 4px 14px rgba(13,49,95,.03);
+}
+.rex-page[data-page="dashboard"] .rxag-goal-head{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  flex-wrap:wrap;margin:0 0 15px;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-head h4{
+  font-size:16px;font-weight:850;color:#133e70;letter-spacing:-.3px;margin:0 0 5px;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-head p{
+  color:#75879c;font-size:11px;margin:0;line-height:1.5;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-period{
+  display:inline-flex;align-items:center;background:#eaf3fd;border:1px solid #d7e8f8;
+  padding:6px 9px;border-radius:99px;color:#3e6995;font-size:11px;font-weight:790;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics>div{
+  border-right:1px solid #e6edf5;padding:4px 12px 5px 4px;min-width:0;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics>div:last-child{border-right:0}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics small{
+  display:block;color:#768da5;font-size:11px;line-height:1.5;font-weight:700;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics strong{
+  display:block;font-size:clamp(17px,1.5vw,24px);
+  color:#163f6d;font-weight:870;letter-spacing:-.4px;margin:7px 0 4px;
+  overflow-wrap:anywhere;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-metrics>div:nth-child(2) strong{color:#177956}
+.rex-page[data-page="dashboard"] .rxag-goal-track{
+  height:10px;overflow:hidden;border-radius:99px;background:#e3ecf6;margin:17px 1px 11px;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-track span{
+  display:block;height:100%;min-width:0;border-radius:99px;
+  background:linear-gradient(90deg,#1465b3,#2693d9);transition:width .25s ease;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-foot{
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  color:#6e839b;font-size:11px;line-height:1.55;
+}
+.rex-page[data-page="dashboard"] .rxag-goal-error{color:#b23740}
+@media(max-width:1200px){
+  .rex-page[data-page="dashboard"] .rxag-goal-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rex-page[data-page="dashboard"] .rxag-goal-metrics>div:nth-child(2){border-right:0}
+}
