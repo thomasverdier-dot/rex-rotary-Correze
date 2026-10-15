@@ -3,9 +3,11 @@
   const ID='rexHistoryComparison';
   const TABLE='manager_agency_monthly_results';
   const MONTHS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-  const euros=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
-  const format=x=>x==null?'—':euros.format(x/100);
-  const editFormat=x=>x==null?'':new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x/100);
+  // La base garde les centimes d'euros. L'interface utilise EXCLUSIVEMENT les k€ :
+  // 1 k€ = 100 000 centimes, soit 102,68 k€ pour 10 268 000 centimes.
+  const kilo=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const format=x=>x==null?'—':kilo.format(Number(x)/100000)+' k€';
+  const editFormat=x=>x==null?'':kilo.format(Number(x)/100000);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
   const z=x=>String(x).padStart(2,'0');
   const dateISO=(y,m)=>y+'-'+z(m)+'-01';
@@ -46,11 +48,11 @@
   let year=current.getFullYear(),month=current.getMonth()+1,rows=[],loading=false,queue=false,editing=false,saving=false,
     metric='ca',showExtras=false,message='',messageType='ok',annualGoal=null,annualGoalError='',lastRequest=0,started=false,debounce=null,lastMarkup='';
 
-  function parseEuro(value){
+  function parseKeuro(value){
     const raw=String(value??'').trim().replace(/[\s\u00a0\u202f]/g,'').replace(',','.');
     if(!/^\d+(?:\.\d{1,2})?$/.test(raw))return null;
     const number=Number(raw);
-    return Number.isFinite(number)&&number>=0&&number<=100000000?Math.round(number*100):null;
+    return Number.isFinite(number)&&number>=0&&number<=1000000?Math.round(number*100000):null;
   }
   function metrics(){return ['ca','nc','uc']}
   function buildPeriod(data,y,m){
@@ -115,11 +117,11 @@
         '<small>'+MONTHS[item.month-1].slice(0,3)+'<span> '+String(item.year).slice(-2)+'</span></small></div>';
     }).join('');
     el.innerHTML='<div class="rxag-header"><div><div class="rxh-eyebrow">PILOTAGE PERSONNEL · AGENCE CORRÈZE</div>'+
-      '<h3>Résultats globaux sur 12 mois</h3><p>CA, NC et UC renseignés par toi, sans dépendance aux vendeurs et à leurs changements de secteur.</p></div>'+
+      '<h3>Résultats globaux sur 12 mois · k€</h3><p>CA, NC et UC en milliers d’euros (k€), saisis par toi, indépendamment des vendeurs et des secteurs.</p></div>'+
       '<div class="rxag-filters"><label for="rxAgencyMonth">Dernier mois</label><input type="month" id="rxAgencyMonth" max="'+maxMonth+
       '" value="'+selected+'"><button type="button" id="rxAgencyReload">↻ Actualiser</button></div></div>'+
       '<section class="rxag-goal" aria-label="Avancement de l’objectif annuel agence">'+
-        '<div class="rxag-goal-head"><div><h4>🎯 Objectif annuel d’agence · '+yearLabel(fiscal)+'</h4>'+
+        '<div class="rxag-goal-head"><div><h4>🎯 Objectif annuel d’agence · '+yearLabel(fiscal)+' · k€</h4>'+
           '<p>Exercice avril '+fiscal+' → mars '+(fiscal+1)+' · résultats globaux saisis par toi.</p></div>'+
           '<span class="rxag-goal-period">'+annual.count+'/'+annual.expected+' mois saisis à date</span></div>'+
         '<div class="rxag-goal-metrics">'+
@@ -149,12 +151,12 @@
       '<div class="rxag-chart" role="img" aria-label="Évolution du '+label(metric)+' sur douze mois">'+points+'</div>'+
       '<div class="rxag-table-head"><div><h4>Cumul et suivi mensuel</h4><p>Les mêmes 12 mois, avec cumul progressif après chaque mois.</p></div>'+
         '<button type="button" id="rxAgencyEdit">'+(editing?'Annuler la saisie':'✎ Saisir ou corriger les chiffres')+'</button></div>'+
-      '<div class="rxag-table-wrap"><table class="rxag-table"><thead><tr><th>Mois</th><th>CA (€)</th><th>NC (€)</th><th>UC (€)</th>'+
+      '<div class="rxag-table-wrap"><table class="rxag-table"><thead><tr><th>Mois</th><th>CA (k€)</th><th>NC (k€)</th><th>UC (k€)</th>'+
         '<th>Cumul CA</th><th>Cumul NC</th><th>Cumul UC</th><th>État</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>'+
       (editing?'<div class="rxag-actions"><button type="button" id="rxAgencySave" class="rxag-save" '+(saving?'disabled':'')+
-        '>'+(saving?'Enregistrement…':'Enregistrer les mois modifiés')+'</button><span>Indique CA, NC et UC sur la même ligne, y compris 0 en cas de mois nul. En euros au centime près.</span></div>':'')+
+        '>'+(saving?'Enregistrement…':'Enregistrer les mois modifiés')+'</button><span>Saisis les montants en k€ (exemple : 102,68 = 102 680 €). Complète CA, NC et UC, avec 0 si besoin.</span></div>':'')+
       '<div id="rxAgencyNotice" class="rxag-'+(messageType==='error'?'error':'notice')+'" role="status">'+esc(message)+'</div>'+
-      '<div class="rxag-footer"><span>Source unique : tes chiffres globaux saisis ici. Les chiffres des commerciaux ou des secteurs ne sont pas additionnés automatiquement.</span>'+
+      '<div class="rxag-footer"><span>Tous les montants affichés sont en k€. Source : tes chiffres globaux ; aucune addition automatique des chiffres vendeurs ou secteurs.</span>'+
       '<button type="button" id="rxAgencyExtras" aria-expanded="'+String(showExtras)+'">'+
        (showExtras?'Masquer les analyses complémentaires':'Afficher les autres analyses (facultatif)')+'</button></div>';
     el.querySelector('#rxAgencyMonth').onchange=e=>{
@@ -206,8 +208,8 @@
         const text=String(input?.value??'').trim();
         if(text===''){fields[k]=null;continue}
         filled++;
-        const parsed=parseEuro(text);
-        if(parsed===null){notice('Montant '+k.toUpperCase()+' incorrect pour '+key+'. Utilise au maximum deux décimales.','error');return}
+        const parsed=parseKeuro(text);
+        if(parsed===null){notice('Montant '+k.toUpperCase()+' incorrect pour '+key+'. Saisis des k€ avec au maximum deux décimales.','error');return}
         fields[k]=parsed;
       }
       const existing=currentRows.get(key);
