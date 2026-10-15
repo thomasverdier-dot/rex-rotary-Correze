@@ -300,8 +300,12 @@
    box.innerHTML=layout;
    const monthInput=box.querySelector('#rxhMonth');
    monthInput.onchange=e=>{
-     if(box.querySelector('#rxhForm')?.dataset.dirty==='1'&&!confirm('Des chiffres historiques sont en cours de saisie. Changer de période sans les enregistrer ?')){
-       e.target.value=iso(year,month);return;
+     const form=box.querySelector('#rxhForm');
+     if(form?.dataset.dirty==='1'){
+       if(!confirm('Des chiffres historiques sont en cours de saisie. Changer de période sans les enregistrer ?')){
+         e.target.value=iso(year,month);return;
+       }
+       form.dataset.dirty='0'; // L'utilisateur a confirmé abandonner le brouillon.
      }
      const [y,m]=String(e.target.value).split('-').map(Number);
      if(y>=2020&&y<=2099&&m>=1&&m<=12){year=y;month=m;lastOutput='';load()}
