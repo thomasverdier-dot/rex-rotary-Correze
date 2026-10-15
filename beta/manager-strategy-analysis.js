@@ -21,7 +21,7 @@
   const thisMonth=monthKey(now.getFullYear(),now.getMonth()+1);
   let tab='agency',agencyView='summary',metric='ca',periodSelect=thisMonth,
       agencyRows=[],pipelineRows=[],crmRows=[],sellerProfiles=[],funnelDraft=false,loaded={agency:false,sellers:false},
-      loading=false,saveBusy=false,message='',error='',initialized=false,lastLoad=0;
+      loading=false,pending=false,saveBusy=false,message='',error='',initialized=false,lastLoad=0;
   const sourceMonths=()=>{
     const dates=[];
     for(let y=2025,m=10;y*12+m<=now.getFullYear()*12+now.getMonth()+1;){
@@ -60,7 +60,8 @@
         dates.reduce((acc,m)=>acc+Number(by.get(m)[k+'_cents']),0):null]))
     });
     const pre=collect(prior),post=collect(after);
-    const years=[2023,2024,2025,2026].map(y=>{
+    const mostRecentYear=Math.max(now.getFullYear(),...records.map(r=>Number(fromDate(r.month_start).slice(0,4))));
+    const years=Array.from({length:mostRecentYear-2023+1},(_,i)=>2023+i).map(y=>{
       const months=records.filter(r=>Number(fromDate(r.month_start).slice(0,4))===y);
       return {year:y,count:months.length,ca:sum(months,'ca_cents'),nc:sum(months,'nc_cents'),uc:sum(months,'uc_cents')};
     });
@@ -70,8 +71,13 @@
         nc:rows.length?sum(rows,'nc_cents')/rows.length:null,
         uc:rows.length?sum(rows,'uc_cents')/rows.length:null};
     });
-    const fiscalMonths=monthRange('2026-01-01',9),oldFY=monthRange('2025-01-01',9);
-    const yoy={current:collect(fiscalMonths),previous:collect(oldFY)};
+    const sortedDates=records.map(r=>fromDate(r.month_start)).filter(m=>m<thisMonth).sort();
+    const latest=sortedDates[sortedDates.length-1]||null;
+    const yoyYear=latest?Number(latest.slice(0,4)):now.getFullYear();
+    const yoyMonth=latest?Number(latest.slice(5,7)):0;
+    const fiscalMonths=yoyMonth?monthRange(yoyYear+'-01-01',yoyMonth):[];
+    const oldFY=yoyMonth?monthRange((yoyYear-1)+'-01-01',yoyMonth):[];
+    const yoy={year:yoyYear,months:yoyMonth,current:collect(fiscalMonths),previous:collect(oldFY)};
     return {pre,post,years,seasonal,yoy,by};
   }
   function funnelAnalysis(rows){
@@ -146,7 +152,7 @@
       }
     }
     if(agencyView==='months'){
-      const sorted=[...a.seasonal].filter(x=>x.ca!==null).sort((x,y)=>x.ca-y.ca);
+      const sorted=[...a.seasonal].filter(x=>x[metric]!==null).sort((x,y)=>x[metric]-y[metric]);
       const metricLabel={ca:'CA',nc:'NC',uc:'UC'}[metric];
       content+='<h3>Mois les plus difficiles · '+metricLabel+'</h3>'+
         '<p class="rms-help">Moyenne observée par mois du calendrier depuis juillet 2023, avec le nombre d’années disponibles. Les moyennes ne permettent pas de garantir les résultats futurs.</p>'+
@@ -172,7 +178,8 @@
            '<td>'+(comparable?delta(y.ca,old.ca):'—')+'</td></tr>';
         }).join('')+'</tbody></table></div>';
       const j=a.yoy;
-      content+='<h4>2026 contre 2025 à période comparable · janvier à septembre</h4>'+
+      content+='<h4>'+j.year+' contre '+(j.year-1)+' à période comparable · janvier à '+
+        (j.months?MN[j.months-1].toLowerCase():'aucun mois clôturé')+'</h4>'+
         '<div class="rms-compare"><div class="rms-compare-row head"><span></span><span>Jan.–sept. 2025</span><span>Jan.–sept. 2026</span><span>Évolution</span></div>'+
         ['ca','nc','uc'].map(k=>'<div class="rms-compare-row"><span>'+k.toUpperCase()+'</span><strong>'+ke(j.previous.totals[k])+
           '</strong><strong>'+ke(j.current.totals[k])+'</strong>'+delta(j.current.totals[k],j.previous.totals[k])+'</div>').join('')+'</div>';
@@ -301,7 +308,8 @@
     finally{saveBusy=false;button.disabled=false}
   }
   async function load(){
-    if(!isAdmin()||loading)return;
+    if(!isAdmin())return;
+    if(loading){pending=true;return}
     const dbClient=db(),u=owner();if(!dbClient||!u)return;
     loading=true;error='';
     const currentTab=tab;
@@ -324,7 +332,10 @@
       loaded[currentTab]=true;lastLoad=Date.now();
       if(currentTab===tab)render();
     }catch(e){error='Données indisponibles : '+String(e?.message||e);if(currentTab===tab)render()}
-    finally{loading=false}
+    finally{
+      loading=false;
+      if(pending||!loaded[tab]){pending=false;load()}
+    }
   }
   function begin(){
     const current=pf();
