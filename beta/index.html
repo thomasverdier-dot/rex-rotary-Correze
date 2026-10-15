@@ -67,7 +67,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261013_26');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261015_01');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=5'),
@@ -80,7 +80,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/seller-dashboard-tasks.js?v=3'),
       local('beta/dashboard-sales-kpis.js?v=2'),
       local('beta/dashboard-live-sales.js?v=2'),
-      local('beta/dashboard-desktop-comparisons.js?v=3'),
+      local('beta/dashboard-desktop-comparisons.js?v=4'),
       local('beta/manager-forecast-reliability.js?v=1'),
       local('beta/friday-crm-report-dashboard.js?v=3'),
       local('beta/forecast-tabs.js?v=2'),
@@ -131,7 +131,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
     doc.head.appendChild(freshStyle);
     const desktopStyle=doc.createElement('link');
     desktopStyle.rel='stylesheet';
-    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=1');
+    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=2');
     const desktopReady=new Promise(resolve=>{
       desktopStyle.onload=()=>resolve(true);
       desktopStyle.onerror=()=>resolve(false);
