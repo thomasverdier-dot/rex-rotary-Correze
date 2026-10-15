@@ -116,7 +116,11 @@
     const trendItems=monthly.map((m,i)=>{
       const t=trends[i],cls=t==null?'missing':t>0?'up':t<0?'down':'steady';
       let tooltip='Évolution indisponible : premier mois, mois absent ou CA précédent nul.';
-      if(t!=null)tooltip=fmtMonth(m)+' : '+trendLabel(t)+' de CA mensuel par rapport à '+fmtMonth(monthly[i-1])+'.';
+      if(t!=null){
+        const previous=new Date(m.year,m.month-2,15,12);
+        tooltip=fmtMonth(m)+' : '+trendLabel(t)+' de CA mensuel par rapport à '+
+          MONTHS[previous.getMonth()]+' '+previous.getFullYear()+'.';
+      }
       return '<div class="rxag-trend-item '+cls+'" title="'+esc(tooltip)+'">'+
         '<span class="rxag-trend-value">'+esc(trendLabel(t))+'</span></div>';
     }).join('');
