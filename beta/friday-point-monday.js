@@ -39,11 +39,112 @@
     if(a.agreed_actions?.trim())out+=`\nAction(s) convenue(s) : ${a.agreed_actions.trim()}`;
     return out}
   function managerBlock(s,a){if(!isAdmin())return '';const id=s.user_id.replaceAll('-','');return `<div class="fp-manager" id="fpm_${id}"><b style="font-size:11px;color:#10233f">Synthèse de l’entretien</b><div class="fp-sub">À compléter pendant ou juste après le point avec le vendeur.</div><div class="fp-manager-grid" style="margin-top:8px"><div><label>Commentaires manager / points abordés</label><textarea class="mgr-comment" placeholder="Ex. activité correcte, manque de prospection physique…">${esc(a.manager_comment||'')}</textarea></div><div><label>Actions convenues / objectifs prochaine semaine</label><textarea class="mgr-actions" placeholder="Ex. 15 prospections physiques et 2 NC à créer…">${esc(a.agreed_actions||'')}</textarea></div></div><div class="fp-summary-actions"><button class="fp-summary-btn" data-uid="${s.user_id}">Générer la synthèse</button><button class="fp-copy" data-uid="${s.user_id}">Copier pour le CRM</button></div><div class="fp-summary-box"><textarea class="crm-summary" placeholder="Clique sur Générer la synthèse…">${esc(a.crm_summary||'')}</textarea><div class="fp-summary-note">La synthèse reste modifiable avant copie dans le CRM.</div></div></div>`}
-  function sellerCard(s){const a=activityFor(s.user_id),t=targetFor(s.user_id),status=overall(s.user_id),f=forecastSums(s.user_id),list=forecasts.filter(d=>d.user_id===s.user_id),editable=!isAdmin()&&getUser()?.id===s.user_id,statusText=status==='good'?'Conforme':status==='warn'?'À surveiller':'À travailler';return `<article class="fp-seller"><div class="fp-seller-head"><div><h3>${esc(s.display_name||'Vendeur')}</h3><span style="font-size:10px;color:#64748b">Secteur ${esc(s.sector_id||'—')} · semaine du ${weekLabel()}</span></div><span class="fp-status ${status}">${statusText}</span></div><div class="fp-body"><div class="fp-metrics">${METRICS.map(([ak,tk,label])=>{const p=pct(a[ak],t[tk]),lv=level(p);return `<div class="fp-metric ${lv}"><span>${label}</span><b>${Number(a[ak]||0)} / ${Number(t[tk]||0)}</b><div class="fp-meter"><i style="width:${Math.min(p,100)}%"></i></div><em>${p}% · ${labelLevel(p)}</em></div>`}).join('')}</div><div class="fp-month"><span><b>Créations d’affaires dans le mois</b><br><small style="color:#64748b">Progression mensuelle, hors statut hebdomadaire</small></span><strong>${Number(a.deals_created_month||0)} / ${Number(t.deals_created_month||0)} (${pct(a.deals_created_month,t.deals_created_month)}%)</strong></div><div class="fp-analysis"><b>Analyse automatique :</b> ${esc(summary(s.user_id))}</div>${editable?activityForm(s.user_id,a):''}<div class="fp-forecast"><h4>Prévisionnel de signature</h4><div class="fp-forecast-kpis"><span class="fp-pill">CL <b>${euro(f.cl)}</b></span><span class="fp-pill">NC <b>${euro(f.nc)}</b></span><span class="fp-pill">Total <b>${euro(f.total)}</b></span><span class="fp-pill">${list.length} affaire${list.length>1?'s':''}</span></div>${list.length?`<table class="fp-deals"><thead><tr><th>Entreprise</th><th>Montant</th><th>Type</th><th>Chance</th><th>RDV négo</th></tr></thead><tbody>${list.map(d=>`<tr><td>${esc(d.company_name)}</td><td>${euro(d.amount)}</td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td></tr>`).join('')}</tbody></table>`:'<div style="font-size:10px;color:#64748b">Aucune affaire prévue cette semaine.</div>'}</div>${managerBlock(s,a)}</div></article>`}
-  function activityForm(uid,a){const id='fp_'+uid.replaceAll('-','');return `<div class="fp-form" id="${id}"><b style="font-size:11px;color:#10233f">Mes chiffres de la semaine</b><div class="fp-form-grid" style="margin-top:7px"><div><label>Prospection physique</label><input class="physical" type="number" min="0" value="${Number(a.physical_prospecting||0)}"></div><div><label>Rendez-vous</label><input class="appointments" type="number" min="0" value="${Number(a.appointments||0)}"></div><div><label>Appels</label><input class="calls" type="number" min="0" value="${Number(a.calls||0)}"></div><div><label>Affaires créées</label><input class="deals" type="number" min="0" value="${Number(a.deals_created||0)}"></div><div><label>Dont NC</label><input class="nc" type="number" min="0" value="${Number(a.nc_deals||0)}"></div><div><label>Créations mois</label><input class="month" type="number" min="0" value="${Number(a.deals_created_month||0)}"></div><button class="fp-main-save" data-uid="${uid}">Enregistrer</button></div></div>`}
-  async function saveActivity(uid){const box=document.getElementById('fp_'+uid.replaceAll('-',''));if(!box)return;const row={user_id:uid,week_start:weekStart,physical_prospecting:Number(box.querySelector('.physical').value||0),appointments:Number(box.querySelector('.appointments').value||0),calls:Number(box.querySelector('.calls').value||0),deals_created:Number(box.querySelector('.deals').value||0),nc_deals:Number(box.querySelector('.nc').value||0),deals_created_month:Number(box.querySelector('.month').value||0),updated_at:new Date().toISOString()};if(row.nc_deals>row.deals_created){alert('Le nombre de NC ne peut pas dépasser le nombre total d’affaires créées.');return}const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});if(r.error){alert(r.error.message);return}await load();alert('Activité enregistrée pour le point vendredi.')}
+  function sellerCard(s){const a=activityFor(s.user_id),t=targetFor(s.user_id),status=overall(s.user_id),f=forecastSums(s.user_id),list=forecasts.filter(d=>d.user_id===s.user_id),editable=!isAdmin()&&getUser()?.id===s.user_id,statusText=status==='good'?'Conforme':status==='warn'?'À surveiller':'À travailler';return `<article class="fp-seller"><div class="fp-seller-head"><div><h3>${esc(s.display_name||'Vendeur')}</h3><span style="font-size:10px;color:#64748b">Secteur ${esc(s.sector_id||'—')} · semaine du ${weekLabel()}</span></div><span class="fp-status ${status}">${statusText}</span></div><div class="fp-body"><div class="fp-metrics">${METRICS.map(([ak,tk,label])=>{const p=pct(a[ak],t[tk]),lv=level(p);return `<div class="fp-metric ${lv}"><span>${label}</span><b>${Number(a[ak]||0)} / ${Number(t[tk]||0)}</b><div class="fp-meter"><i style="width:${Math.min(p,100)}%"></i></div><em>${p}% · ${labelLevel(p)}</em></div>`}).join('')}</div><div class="fp-month"><span><b>Créations d’affaires dans le mois</b><br><small style="color:#64748b">Progression mensuelle, hors statut hebdomadaire</small></span><strong>${Number(a.deals_created_month||0)} / ${Number(t.deals_created_month||0)} (${pct(a.deals_created_month,t.deals_created_month)}%)</strong></div><div class="fp-analysis"><b>Analyse automatique :</b> ${esc(summary(s.user_id))}</div>${pfSummary(a)}${editable?activityForm(s.user_id,a):''}<div class="fp-forecast"><h4>Prévisionnel de signature</h4><div class="fp-forecast-kpis"><span class="fp-pill">CL <b>${euro(f.cl)}</b></span><span class="fp-pill">NC <b>${euro(f.nc)}</b></span><span class="fp-pill">Total <b>${euro(f.total)}</b></span><span class="fp-pill">${list.length} affaire${list.length>1?'s':''}</span></div>${list.length?`<table class="fp-deals"><thead><tr><th>Entreprise</th><th>Montant</th><th>Type</th><th>Chance</th><th>RDV négo</th></tr></thead><tbody>${list.map(d=>`<tr><td>${esc(d.company_name)}</td><td>${euro(d.amount)}</td><td>${d.client_type==='nouveau'?'NC':'CL'}</td><td>${Number(d.probability||0)}%</td><td>${d.negotiation_meeting_scheduled?'✅':'—'}</td></tr>`).join('')}</tbody></table>`:'<div style="font-size:10px;color:#64748b">Aucune affaire prévue cette semaine.</div>'}</div>${managerBlock(s,a)}</div></article>`}
+
+  const PORTFOLIO_TYPES=['rnv','nc','uc'];
+  const PORT_LABEL={rnv:'RNV',nc:'NC',uc:'UC'};
+  const pfKe=v=>new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)/100000)+' k€';
+  const pfKeInput=v=>v==null?'':new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)/100000);
+  const pfReady=a=>a&&PORTFOLIO_TYPES.every(k=>a['portfolio_'+k+'_count']!=null&&a['portfolio_'+k+'_cents']!=null);
+  const pfCount=a=>PORTFOLIO_TYPES.reduce((n,k)=>n+Number(a['portfolio_'+k+'_count']||0),0);
+  const pfAmount=a=>PORTFOLIO_TYPES.reduce((n,k)=>n+Number(a['portfolio_'+k+'_cents']||0),0);
+  function pfSummary(a){
+    if(!pfReady(a))return '<div class="fp-portfolio-snapshot">Projets détectés cette semaine : <b>non renseignés par catégorie</b></div>';
+    return '<div class="fp-portfolio-snapshot"><b>Projets détectés cette semaine (non signés)</b><div class="fp-portfolio-snapshot-row">'+
+      PORTFOLIO_TYPES.map(t=>'<span>'+PORT_LABEL[t]+' : '+a['portfolio_'+t+'_count']+' projet(s) / '+pfKe(a['portfolio_'+t+'_cents'])+'</span>').join('')+
+      '<strong>TOTAL : '+pfCount(a)+' projet(s) / '+pfKe(pfAmount(a))+'</strong></div></div>';
+  }
+  const pfCountParse=x=>/^\d+$/.test(String(x??'').trim())&&Number(x)<=100000?Number(x):null;
+  function pfKeParse(x){
+    const v=String(x??'').trim().replace(/[\s\u00a0\u202f]/g,'').replace(',','.');
+    if(!/^\d+(?:\.\d{1,2})?$/.test(v))return null;
+    const n=Number(v);return Number.isFinite(n)&&n<=10000000?Math.round(n*100000):null;
+  }
+  function pfFromForm(box){
+    if(!box)return null;
+    const values={},totals={count:0,cents:0};
+    for(const t of PORTFOLIO_TYPES){
+      const c=pfCountParse(box.querySelector('.fp-p-'+t+'-count')?.value);
+      const v=pfKeParse(box.querySelector('.fp-p-'+t+'-amount')?.value);
+      if(c==null||v==null||(c===0&&v>0))return null;
+      values['portfolio_'+t+'_count']=c;
+      values['portfolio_'+t+'_cents']=v;
+      totals.count+=c;totals.cents+=v;
+    }
+    return {values,totals};
+  }
+  function pfUpdate(box){
+    const p=pfFromForm(box),note=box?.querySelector('.fp-portfolio-live');
+    if(note)note.textContent=p?'TOTAL : '+p.totals.count+' projet(s) / '+pfKe(p.totals.cents):
+      'Renseigne 6 champs (0 si aucune affaire) pour calculer le total.';
+    const deals=box?.querySelector('.deals'),nc=box?.querySelector('.nc');
+    if(deals)deals.value=p?String(p.totals.count):'';
+    if(nc)nc.value=p?String(p.values.portfolio_nc_count):'';
+  }
+
+  function activityForm(uid,a){
+    const id='fp_'+uid.replaceAll('-','');
+    const fields=[
+      ['physical','Prospection physique','physical_prospecting'],
+      ['appointments','Rendez-vous','appointments'],
+      ['calls','Appels','calls'],
+      ['month','Créations dans le mois','deals_created_month']
+    ].map(([cls,label,col])=>
+      '<div><label>'+label+'</label><input class="'+cls+'" type="number" min="0" step="1" value="'+Number(a[col]||0)+'"></div>'
+    ).join('');
+    const cats=PORTFOLIO_TYPES.map(t=>
+      '<div class="fp-portfolio-category"><b>'+PORT_LABEL[t]+'</b>'+
+        '<label>Nombre de projets levés<input class="fp-p-'+t+'-count" type="text" inputmode="numeric" placeholder="0" value="'+
+          esc(a['portfolio_'+t+'_count']??'')+'"></label>'+
+        '<label>Montant potentiel (k€)<input class="fp-p-'+t+'-amount" type="text" inputmode="decimal" placeholder="0,00" value="'+
+          esc(pfKeInput(a['portfolio_'+t+'_cents']))+'"></label></div>'
+    ).join('');
+    return '<div class="fp-form" id="'+id+'"><b>Mes chiffres de la semaine</b>'+
+      '<div class="fp-form-grid" style="margin-top:7px">'+fields+
+        '<div class="fp-portfolio-form"><div class="fp-portfolio-title"><b>Projets entrés en portefeuille cette semaine</b>'+
+          '<small>Affaires détectées, pas encore signées. NC / UC / RNV, total calculé automatiquement.</small></div>'+
+          '<div class="fp-portfolio-categories">'+cats+'</div>'+
+          '<div class="fp-portfolio-live" role="status">Renseigne les 6 champs (0 si aucune affaire).</div></div>'+
+        '<button class="fp-main-save" data-uid="'+uid+'" type="button">Enregistrer mes chiffres de la semaine</button>'+
+      '</div><input type="hidden" class="deals" value="'+Number(a.deals_created||0)+'">'+
+      '<input type="hidden" class="nc" value="'+Number(a.nc_deals||0)+'"></div>';
+  }
+  async function saveActivity(uid){
+    const box=document.getElementById('fp_'+uid.replaceAll('-',''));
+    if(!box)return;
+    if(getProfile()?.role!=='seller'||getUser()?.id!==uid){
+      alert('Seul le vendeur peut renseigner son propre Point vendredi.');return;
+    }
+    const portfolio=pfFromForm(box);
+    if(!portfolio){
+      alert('Complète les 6 champs NC, UC et RNV (nombre et montant en k€, 0 si aucune affaire). Un montant positif doit correspondre à au moins un projet.');
+      return;
+    }
+    const activity={physical_prospecting:Number(box.querySelector('.physical').value),
+      appointments:Number(box.querySelector('.appointments').value),
+      calls:Number(box.querySelector('.calls').value),
+      deals_created_month:Number(box.querySelector('.month').value)};
+    if(Object.values(activity).some(v=>!Number.isInteger(v)||v<0||v>100000)){
+      alert('Les autres indicateurs de la semaine doivent être des nombres entiers positifs ou nuls.');return;
+    }
+    const row={user_id:uid,week_start:weekStart,...activity,
+      deals_created:portfolio.totals.count,nc_deals:portfolio.values.portfolio_nc_count,
+      ...portfolio.values,updated_at:new Date().toISOString()};
+    const button=box.querySelector('.fp-main-save');
+    if(button?.disabled)return;
+    if(button){button.disabled=true;button.textContent='Enregistrement…'}
+    try{
+      const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});
+      if(r.error)throw r.error;
+      await load();
+      alert('Point vendredi enregistré : '+portfolio.totals.count+' projet(s) détecté(s), potentiel de '+pfKe(portfolio.totals.cents)+'.');
+    }catch(e){
+      alert('Enregistrement impossible : '+(e?.message||e));
+      if(button){button.disabled=false;button.textContent='Enregistrer mes chiffres de la semaine'}
+    }
+  }
   async function saveManager(uid,generate){const s=sellers.find(x=>x.user_id===uid),box=document.getElementById('fpm_'+uid.replaceAll('-',''));if(!s||!box)return;const current=activityFor(uid),comment=box.querySelector('.mgr-comment').value.trim(),actions=box.querySelector('.mgr-actions').value.trim();current.manager_comment=comment;current.agreed_actions=actions;const text=generate?buildCrmSummary(s):box.querySelector('.crm-summary').value.trim();const row={user_id:uid,week_start:weekStart,manager_comment:comment,agreed_actions:actions,crm_summary:text,summary_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});if(r.error){alert(r.error.message);return}box.querySelector('.crm-summary').value=text;const a=activities.find(x=>x.user_id===uid);if(a)Object.assign(a,row);else activities.push({...activityFor(uid),...row});if(generate)alert('Synthèse générée et enregistrée.')}
   async function copySummary(uid){const s=sellers.find(x=>x.user_id===uid),box=document.getElementById('fpm_'+uid.replaceAll('-',''));if(!s||!box)return;let text=box.querySelector('.crm-summary').value.trim();if(!text){await saveManager(uid,true);text=box.querySelector('.crm-summary').value.trim()}else await saveManager(uid,false);try{await navigator.clipboard.writeText(text);alert('Synthèse copiée. Tu peux la coller directement dans le CRM.')}catch(e){box.querySelector('.crm-summary').select();document.execCommand('copy');alert('Synthèse copiée. Tu peux la coller directement dans le CRM.')}}
-  function render(){renderAdmin();const box=document.getElementById('fpCards');if(!box)return;box.innerHTML=sellers.length?sellers.map(s=>sellerCard(s)).join(''):'<div class="fp-empty">Aucun vendeur disponible.</div>';box.querySelectorAll('.fp-main-save').forEach(b=>b.onclick=()=>saveActivity(b.dataset.uid));box.querySelectorAll('.fp-summary-btn').forEach(b=>b.onclick=()=>saveManager(b.dataset.uid,true));box.querySelectorAll('.fp-copy').forEach(b=>b.onclick=()=>copySummary(b.dataset.uid))}
+  function render(){renderAdmin();const box=document.getElementById('fpCards');if(!box)return;box.innerHTML=sellers.length?sellers.map(s=>sellerCard(s)).join(''):'<div class="fp-empty">Aucun vendeur disponible.</div>';box.querySelectorAll('.fp-main-save').forEach(b=>b.onclick=()=>saveActivity(b.dataset.uid));box.querySelectorAll('.fp-portfolio-form').forEach(form=>{const box=form.closest('.fp-form');form.addEventListener('input',()=>pfUpdate(box));pfUpdate(box)});box.querySelectorAll('.fp-summary-btn').forEach(b=>b.onclick=()=>saveManager(b.dataset.uid,true));box.querySelectorAll('.fp-copy').forEach(b=>b.onclick=()=>copySummary(b.dataset.uid))}
   window.loadFridayPoint=load;let tries=0;const timer=setInterval(()=>{tries++;if(mount()||tries>100)clearInterval(timer)},250);window.addEventListener('load',()=>setTimeout(mount,600));
 })();

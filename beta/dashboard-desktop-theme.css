@@ -817,3 +817,46 @@
 .rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point.rxah-latest{
   stroke:#fff;stroke-width:3.3;filter:drop-shadow(0 0 3px rgba(31,79,125,.32))
 }
+
+/* Pilotage du portefeuille détecté chaque vendredi, admin uniquement. */
+.rex-page[data-page="dashboard"] .rxpf-accordion{
+  margin:15px 0;border:1px solid #dce8f4;background:#fff;border-radius:13px;overflow:hidden
+}
+.rex-page[data-page="dashboard"] .rxpf-accordion>summary{
+  cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;
+  padding:14px 17px;background:#f4f9ff;color:#1c4f80;font-size:14px;font-weight:850;
+}
+.rex-page[data-page="dashboard"] .rxpf-accordion>summary::-webkit-details-marker{display:none}
+.rex-page[data-page="dashboard"] .rxpf-accordion>summary span{color:#68839e;font-size:11px}
+.rex-page[data-page="dashboard"] .rxpf-accordion[open]>summary{border-bottom:1px solid #e2ebf5}
+.rex-page[data-page="dashboard"] .rxpf-content{padding:15px 16px;color:#6b7e92;font-size:12px}
+.rex-page[data-page="dashboard"] .rxpf-intro{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rex-page[data-page="dashboard"] .rxpf-intro h4{font-size:15px;margin:0 0 4px;color:#194a7c}
+.rex-page[data-page="dashboard"] .rxpf-intro p{font-size:11px;margin:0;color:#71869c}
+.rex-page[data-page="dashboard"] .rxpf-controls{display:flex;align-items:center;gap:8px}
+.rex-page[data-page="dashboard"] .rxpf-controls label{font-size:11px;font-weight:750}
+.rex-page[data-page="dashboard"] .rxpf-controls select,
+.rex-page[data-page="dashboard"] .rxpf-controls button{border:1px solid #d1e0ee;border-radius:7px;padding:8px 10px;color:#205586;background:#fff;font-size:11px;font-weight:800;cursor:pointer}
+.rex-page[data-page="dashboard"] .rxpf-overview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:14px 0}
+.rex-page[data-page="dashboard"] .rxpf-overview>div{
+  display:flex;flex-direction:column;gap:6px;padding:11px;border:1px solid #dfebf5;border-radius:10px;background:#f8fbff
+}
+.rex-page[data-page="dashboard"] .rxpf-overview small{color:#71869f;font-size:10px}
+.rex-page[data-page="dashboard"] .rxpf-overview strong{color:#174d7c;font-size:14px;font-variant-numeric:tabular-nums}
+.rex-page[data-page="dashboard"] .rxpf-scroll{max-height:450px;overflow:auto;border:1px solid #dfebf4;border-radius:9px}
+.rex-page[data-page="dashboard"] .rxpf-table{border-collapse:collapse;width:100%;min-width:1080px;font-size:11px;font-variant-numeric:tabular-nums}
+.rex-page[data-page="dashboard"] .rxpf-table th,
+.rex-page[data-page="dashboard"] .rxpf-table td{padding:10px 9px;border-bottom:1px solid #ebf0f5;text-align:center;color:#3e5e7b;white-space:nowrap}
+.rex-page[data-page="dashboard"] .rxpf-table th:first-child,
+.rex-page[data-page="dashboard"] .rxpf-table td:first-child{text-align:left}
+.rex-page[data-page="dashboard"] .rxpf-table thead th{position:sticky;top:0;background:#f0f6fc;z-index:1;font-size:10px;color:#52748f}
+.rex-page[data-page="dashboard"] .rxpf-table tbody th{font-weight:800;color:#1a4a7e}
+.rex-page[data-page="dashboard"] .rxpf-table small{display:block;font-size:10px;color:#7c8da1;margin-top:3px}
+.rex-page[data-page="dashboard"] .rxpf-up{font-weight:800!important;color:#168157!important}
+.rex-page[data-page="dashboard"] .rxpf-down{font-weight:800!important;color:#be4248!important}
+.rex-page[data-page="dashboard"] .rxpf-insights{padding:12px 14px;margin-top:11px;background:#f7fbff;border-radius:8px;color:#486782;font-size:11px;line-height:1.6}
+.rex-page[data-page="dashboard"] .rxpf-insights h5{margin:0 0 8px;font-size:12px;color:#1f527f}
+.rex-page[data-page="dashboard"] .rxpf-insights p{margin:5px 0}
+.rex-page[data-page="dashboard"] .rxpf-empty,.rex-page[data-page="dashboard"] .rxpf-note{margin:12px 0;color:#68839a;font-size:11px;line-height:1.6}
+.rex-page[data-page="dashboard"] .rxpf-error{color:#b23640;padding:15px}
+@media(max-width:1100px){.rex-page[data-page="dashboard"] .rxpf-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
