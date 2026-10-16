@@ -334,7 +334,10 @@
     }catch(e){error='Données indisponibles : '+String(e?.message||e);if(currentTab===tab)render()}
     finally{
       loading=false;
-      if(pending||!loaded[tab]){pending=false;load()}
+      // Retenter UNIQUEMENT lorsqu'un changement d'onglet a demandé une
+      // seconde requête pendant la première. En cas d'erreur SQL/RLS/réseau,
+      // ne jamais rappeler load() indéfiniment : cela bloquait le navigateur.
+      if(pending){pending=false;load()}
     }
   }
   function begin(){
