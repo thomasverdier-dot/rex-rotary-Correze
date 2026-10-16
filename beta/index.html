@@ -80,7 +80,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/seller-dashboard-tasks.js?v=4'),
       local('beta/dashboard-sales-kpis.js?v=2'),
       local('beta/dashboard-live-sales.js?v=2'),
-      local('beta/dashboard-agency-direct.js?v=7'),
+      local('beta/dashboard-agency-direct.js?v=8'),
       local('beta/manager-forecast-reliability.js?v=1'),
       local('beta/friday-crm-report-dashboard.js?v=3'),
       local('beta/forecast-tabs.js?v=2'),
@@ -100,8 +100,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/prospect-row-replace.js?v=1'),
       'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
       local('beta/prospect-excel-export.js?v=2'),
-      local('beta/friday-point-monday.js?v=1'),
-      local('beta/friday-weekly-entry.js?v=1'),
+      local('beta/friday-point-monday.js?v=2'),
+      local('beta/friday-weekly-entry.js?v=2'),
       local('beta/friday-wide-nextweek.js?v=3'),
       local('beta/monthly-manual-promotion.js?v=3'),
       local('beta/friday-signed-deals.js?v=8'),
@@ -133,7 +133,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
     doc.head.appendChild(freshStyle);
     const desktopStyle=doc.createElement('link');
     desktopStyle.rel='stylesheet';
-    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=7');
+    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=8');
     const desktopReady=new Promise(resolve=>{
       desktopStyle.onload=()=>resolve(true);
       desktopStyle.onerror=()=>resolve(false);
