@@ -129,6 +129,27 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-comment.js?v=1'),
       local('beta/friday-splus1-editor.js?v=5')
     ];
+    // Diagnostic temporaire, déclenché seulement par ?safe=1.
+    // Désactive les modules du tableau de bord les plus actifs, sans modifier
+    // les données, l'authentification ou les fonctions de saisie commerciales.
+    const safeMode=new URLSearchParams(location.search).get('safe')==='1';
+    if(safeMode){
+      const excluded=[
+        '/beta/seller-dashboard-tasks.js',
+        '/beta/dashboard-live-sales.js',
+        '/beta/manager-forecast-reliability.js',
+        '/beta/friday-crm-report-dashboard.js',
+        '/beta/dashboard-agency-direct.js',
+        '/beta/dashboard-sales-kpis.js'
+      ];
+      for(let i=modules.length-1;i>=0;i--){
+        if(excluded.some(path=>modules[i].includes(path)))modules.splice(i,1);
+      }
+      const marker=doc.createElement('div');
+      marker.textContent='MODE DIAGNOSTIC · Analyses secondaires suspendues';
+      marker.style.cssText='position:fixed;bottom:8px;left:8px;z-index:99999;background:#fff3cd;color:#664d03;padding:7px 10px;border:1px solid #ffe69c;border-radius:7px;font:12px Segoe UI,Arial;pointer-events:none';
+      doc.body.appendChild(marker);
+    }
     // Chargement ordonné sans préchargement massif (évite la saturation de Chrome).
     // Exécuter dans l'ordre : les modules dépendent les uns des autres.
     // Chaque module a un délai maximum pour éviter un écran bloqué indéfiniment.
