@@ -197,6 +197,40 @@
       gaps:monthly.length-entries.length,width:W,trendStyle,lastIndex:latest.index};
   }
 
+  // Le diagnostic complet est chargé uniquement après clic, afin de conserver
+  // le démarrage stable rétabli le 16/10/2026 (pas de nouveau script initial).
+  let strategyRequest=null;
+  function openStrategy(){
+    if(!isAdmin())return;
+    const trigger=section()?.querySelector('#rxAgencyStrategy');
+    const fail=msg=>{
+      if(trigger){trigger.disabled=false;trigger.textContent='📊 Analyse stratégique'}
+      notice(msg,'error');
+    };
+    if(typeof window.rexOpenManagerStrategy==='function'){
+      if(!window.rexOpenManagerStrategy())fail('Le module stratégique n’a pas pu s’ouvrir.');
+      return;
+    }
+    if(strategyRequest)return;
+    if(trigger){trigger.disabled=true;trigger.textContent='Chargement de l’analyse…'}
+    const source=new URL('beta/manager-strategy-analysis.js?v=2&beta_build=20261016_lazy_01',location.href).href;
+    strategyRequest=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src=source;script.async=true;
+      script.onload=()=>resolve(true);
+      script.onerror=()=>reject(new Error('Téléchargement indisponible'));
+      document.body.appendChild(script);
+    });
+    strategyRequest.then(()=>{
+      strategyRequest=null;
+      if(trigger){trigger.disabled=false;trigger.textContent='📊 Analyse stratégique'}
+      if(typeof window.rexOpenManagerStrategy!=='function'||!window.rexOpenManagerStrategy())
+        fail('Le module stratégique ne répond pas. Le reste du CRM reste disponible.');
+    }).catch(e=>{
+      strategyRequest=null;
+      fail('Analyse temporairement indisponible : '+String(e?.message||e)+'. Le CRM reste accessible.');
+    });
+  }
   function mount(){
     if(!isAdmin()){section()?.remove();return null}
     const p=page();if(!p)return null;
@@ -254,7 +288,8 @@
         '<option value="all" '+(viewRange==='all'?'selected':'')+'>Depuis juillet 2023</option>'+
         '<option value="12" '+(viewRange==='12'?'selected':'')+'>12 derniers mois</option></select>'+
         '<label for="rxAgencyMonth">Dernier mois</label><input type="month" id="rxAgencyMonth" min="'+HISTORY_START+'" max="'+maxMonth+
-      '" value="'+selected+'"><button type="button" id="rxAgencyReload">↻ Actualiser</button></div></div>'+
+      '" value="'+selected+'"><button type="button" id="rxAgencyReload">↻ Actualiser</button>'+
+      '<button type="button" id="rxAgencyStrategy" title="Ouvrir diagnostic historique et taux vendeurs">📊 Analyse stratégique</button></div></div>'+
       '<section class="rxag-goal" aria-label="Avancement de l’objectif annuel agence">'+
         '<div class="rxag-goal-head"><div><h4>🎯 Objectif annuel d’agence · '+yearLabel(fiscal)+' · k€</h4>'+
           '<p>Exercice avril '+fiscal+' → mars '+(fiscal+1)+' · résultats globaux saisis par toi.</p></div>'+
@@ -324,6 +359,7 @@
       if(editing&&!confirm('Quitter la saisie sans enregistrer les modifications ?')){e.target.value=selected;return}
       const next=input.split('-').map(Number);year=next[0];month=next[1];editing=false;lastMarkup='';load();
     };
+    el.querySelector('#rxAgencyStrategy').onclick=()=>openStrategy();
     el.querySelector('#rxAgencyReload').onclick=()=>{
       if(editing){notice('Enregistre ou annule la saisie avant d’actualiser.','error');return}
       load();

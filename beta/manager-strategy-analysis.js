@@ -334,7 +334,10 @@
     }catch(e){error='Données indisponibles : '+String(e?.message||e);if(currentTab===tab)render()}
     finally{
       loading=false;
-      if(pending||!loaded[tab]){pending=false;load()}
+      // Retenter UNIQUEMENT lorsqu'un changement d'onglet a demandé une
+      // seconde requête pendant la première. En cas d'erreur SQL/RLS/réseau,
+      // ne jamais rappeler load() indéfiniment : cela bloquait le navigateur.
+      if(pending){pending=false;load()}
     }
   }
   function begin(){
@@ -348,6 +351,22 @@
   window.addEventListener('focus',()=>{if(!initialized||!element()?.querySelector('.rms-accordion')?.open)return;
     if(Date.now()-lastLoad>120000&&!saveBusy){loaded[tab]=false;load()}
   });
-  let n=0;const timer=setInterval(()=>{if(begin()||++n>100)clearInterval(timer)},500);
-  window.addEventListener('load',()=>setTimeout(begin,900));
+  // Chargement EXCLUSIVEMENT à la demande du responsable depuis le tableau
+  // de bord. Ne plus lancer de timers au démarrage de l'application.
+  window.rexOpenManagerStrategy=function(){
+    try{
+      if(!isAdmin()||!begin())return false;
+      const panel=element(),details=panel?.querySelector('details.rms-accordion');
+      if(!details)return false;
+      if(!details.open)details.open=true;
+      else if(!loaded[tab]&&!loading)load();
+      else if(loaded[tab])render();
+      if(typeof panel.scrollIntoView==='function')
+        panel.scrollIntoView({behavior:'smooth',block:'start'});
+      return true;
+    }catch(e){
+      console.error('[Rex] Impossible d’ouvrir l’analyse stratégique',e);
+      return false;
+    }
+  };
 })();
