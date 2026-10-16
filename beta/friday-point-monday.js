@@ -66,7 +66,7 @@
     for(const t of PORTFOLIO_TYPES){
       const c=pfCountParse(box.querySelector('.fp-p-'+t+'-count')?.value);
       const v=pfKeParse(box.querySelector('.fp-p-'+t+'-amount')?.value);
-      if(c==null||v==null)return null;
+      if(c==null||v==null||(c===0&&v>0))return null;
       values['portfolio_'+t+'_count']=c;
       values['portfolio_'+t+'_cents']=v;
       totals.count+=c;totals.cents+=v;
@@ -117,7 +117,7 @@
     }
     const portfolio=pfFromForm(box);
     if(!portfolio){
-      alert('Complète le nombre et le montant (en k€) des projets RNV, NC et UC, avec 0 si aucun projet. Deux décimales maximum.');
+      alert('Complète les 6 champs NC, UC et RNV (nombre et montant en k€, 0 si aucune affaire). Un montant positif doit correspondre à au moins un projet.');
       return;
     }
     const activity={physical_prospecting:Number(box.querySelector('.physical').value),
