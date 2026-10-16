@@ -26,20 +26,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
   const frame=document.getElementById('appFrame');
   const badge=document.getElementById('betaBadge');
   const root=new URL('../',location.href);
-  // Redimensionnement explicite de l'iframe pour Chrome en mode application.
-  // N'affecte ni les données ni les modules métier.
-  function fitFrame(){
-    const w=Math.max(document.documentElement.clientWidth,window.innerWidth||0);
-    const h=Math.max(document.documentElement.clientHeight,window.innerHeight||0);
-    frame.style.setProperty('width',w+'px','important');
-    frame.style.setProperty('height',h+'px','important');
-    frame.style.setProperty('max-width','none','important');
-    frame.style.setProperty('max-height','none','important');
-    frame.style.setProperty('left','0','important');
-    frame.style.setProperty('top','0','important');
-  }
-  fitFrame();
-  window.addEventListener('resize',fitFrame);
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
   async function unregisterWorkers(){
@@ -206,7 +192,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       bootText.textContent='Une erreur est survenue au chargement. Recharge la page.';
       return;
     }
-    fitFrame();
     frame.style.display='block';
     boot.style.display='none';
     badge.style.display='none';
