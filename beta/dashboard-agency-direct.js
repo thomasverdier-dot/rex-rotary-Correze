@@ -243,6 +243,37 @@
       fail('Analyse temporairement indisponible : '+String(e?.message||e)+'. Le CRM reste accessible.');
     });
   }
+  // L'analyse hebdomadaire du portefeuille est chargée au clic du responsable,
+  // sans ajouter de script ni de requête au démarrage du CRM.
+  let portfolioOpen=false,portfolioRequest=null;
+  function openPortfolioPanel(){
+    if(!isAdmin())return;
+    const box=section()?.querySelector('#rxAgencyPortfolioContent');
+    if(!box)return;
+    if(typeof window.rexFridayPortfolioDashboard==='function'){
+      try{window.rexFridayPortfolioDashboard()}catch(error){box.textContent='Analyse indisponible : '+(error?.message||error)}
+      return;
+    }
+    if(portfolioRequest)return;
+    box.textContent='Chargement de l’analyse portefeuille…';
+    portfolioRequest=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src=new URL('beta/friday-portfolio-dashboard.js?v=1',location.href).href;
+      script.async=true;
+      script.onload=()=>resolve();
+      script.onerror=()=>reject(new Error('Téléchargement indisponible'));
+      document.body.appendChild(script);
+    });
+    portfolioRequest.then(()=>{
+      portfolioRequest=null;
+      if(!section()?.querySelector('#rxAgencyPortfolio')?.open)return;
+      if(typeof window.rexFridayPortfolioDashboard!=='function'||!window.rexFridayPortfolioDashboard())
+        box.textContent='Analyse indisponible. Réessaie en refermant puis rouvrant le panneau.';
+    }).catch(error=>{
+      portfolioRequest=null;
+      box.textContent='Analyse indisponible : '+String(error?.message||error)+'. Le reste du CRM reste accessible.';
+    });
+  }
   function mount(){
     if(!isAdmin()){section()?.remove();return null}
     const p=page();if(!p)return null;
@@ -359,6 +390,9 @@
         '<th>Cumul CA</th><th>Cumul NC</th><th>Cumul UC</th><th>CA vs M-1</th><th>CA vs N-1</th><th>État</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>'+
       (editing?'<div class="rxag-actions"><button type="button" id="rxAgencySave" class="rxag-save" '+(saving?'disabled':'')+
         '>'+(saving?'Enregistrement…':'Enregistrer les mois modifiés')+'</button><span>Saisis les montants en k€ (exemple : 102,68 = 102 680 €). Complète CA, NC et UC, avec 0 si besoin.</span></div>':'')+
+      '<details id="rxAgencyPortfolio" class="rxpf-accordion" '+(portfolioOpen?'open':'')+'>'+
+        '<summary>📁 Affaires entrées en portefeuille · NC / UC / RNV <span>Analyse par vendeur</span></summary>'+
+        '<div id="rxAgencyPortfolioContent" class="rxpf-content">Ouvre ce panneau pour analyser les projets détectés chaque vendredi.</div></details>'+
       '<div id="rxAgencyNotice" class="rxag-'+(messageType==='error'?'error':'notice')+'" role="status">'+esc(message)+'</div>'+
       '<div class="rxag-footer"><span>Tous les montants affichés sont en k€. Source : tes chiffres globaux ; aucune addition automatique des chiffres vendeurs ou secteurs.</span>'+
       '<button type="button" id="rxAgencyExtras" aria-expanded="'+String(showExtras)+'">'+
@@ -367,6 +401,11 @@
     // La vue historique s'ouvre sur les mois les plus récents ; on peut
     // toujours remonter jusqu'à juillet 2023 en faisant défiler à gauche.
     if(timeline&&viewRange==='all')timeline.scrollLeft=timeline.scrollWidth;
+    const pd=el.querySelector('#rxAgencyPortfolio');
+    if(pd){
+      pd.addEventListener('toggle',()=>{portfolioOpen=pd.open;if(pd.open)openPortfolioPanel()});
+      if(pd.open)openPortfolioPanel();
+    }
     el.querySelector('#rxAgencyHealthMetric').onchange=e=>{
       const next=e.target.value;
       if(!metrics().includes(next)){e.target.value=healthMetric;return}
