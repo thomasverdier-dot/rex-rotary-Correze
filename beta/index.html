@@ -48,12 +48,23 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
 
   async function addScript(doc,src){
     return new Promise(resolve=>{
-      const s=doc.createElement('script');
-      s.src=src;
-      s.async=false;
-      s.onload=()=>resolve(true);
-      s.onerror=()=>resolve(false);
-      doc.body.appendChild(s);
+      const script=doc.createElement('script');
+      let finished=false;
+      const finish=ok=>{
+        if(finished)return;
+        finished=true;
+        clearTimeout(timer);
+        script.onload=null;
+        script.onerror=null;
+        if(!ok)script.remove();
+        resolve(ok);
+      };
+      const timer=setTimeout(()=>finish(false),src.includes('cdn.jsdelivr.net')?10000:7000);
+      script.src=src;
+      script.async=false;
+      script.onload=()=>finish(true);
+      script.onerror=()=>finish(false);
+      doc.body.appendChild(script);
     });
   }
 
@@ -118,9 +129,28 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-comment.js?v=1'),
       local('beta/friday-splus1-editor.js?v=5')
     ];
-    // Chargement séquentiel éprouvé : restauré après plantage signalé.
-    // Maintenir l'ordre et le temps d'initialisation de chaque module.
-    for(const src of modules)await addScript(doc,src);
+    // Précharger en parallèle les ressources réseau sans changer leur ordre d'exécution.
+    // Le navigateur réutilise normalement les téléchargements lors de l'injection ordonnée.
+    for(const src of modules){
+      const hint=doc.createElement('link');
+      hint.rel='preload';
+      hint.as='script';
+      hint.href=src;
+      doc.head.appendChild(hint);
+    }
+    // Exécuter dans l'ordre : les modules dépendent les uns des autres.
+    // Chaque module a un délai maximum pour éviter un écran bloqué indéfiniment.
+    const failures=[];
+    for(const src of modules){
+      if(!await addScript(doc,src))failures.push(src);
+    }
+    if(failures.length){
+      console.warn('[Rex Beta] Modules non chargés',failures);
+      const notice=doc.createElement('div');
+      notice.style.cssText='position:fixed;bottom:16px;right:16px;z-index:999999;background:#fff3cd;color:#664d03;padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px #0002;font:13px Segoe UI,Arial';
+      notice.textContent='Certains modules n’ont pas pu être chargés. Vérifiez les fonctions avant toute saisie.';
+      doc.body.appendChild(notice);
+    }
     // Charger la présentation épurée dans l'iframe avant de l'afficher.
     // Le CSS est isolé au prévisionnel mensuel : aucune logique métier modifiée.
     const freshStyle=doc.createElement('link');
