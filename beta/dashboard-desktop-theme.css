@@ -764,3 +764,56 @@
    grid-template-columns:repeat(2,minmax(0,1fr));
  }
 }
+
+/* Courbe de santé : CA, NC ou UC mensuel, non cumulé, pilotage manager desktop. */
+.rex-page[data-page="dashboard"] .rxah-health-header{align-items:center}
+.rex-page[data-page="dashboard"] .rxah-health-header h4{font-size:17px;color:#173e69}
+.rex-page[data-page="dashboard"] .rxah-health-header p{max-width:620px}
+.rex-page[data-page="dashboard"] .rxah-health-header .rxag-cum-summary{
+  display:grid;grid-template-columns:repeat(2,auto);
+  justify-items:end;align-items:center;column-gap:10px;row-gap:5px;
+}
+.rex-page[data-page="dashboard"] .rxah-health-header .rxag-cum-summary label{
+  color:#667e98;font-size:11px;font-weight:800;
+}
+.rex-page[data-page="dashboard"] .rxah-health-header .rxag-cum-summary select{
+  border:1px solid #cddfeb;border-radius:7px;color:#1a517d;background:#fff;
+  padding:6px 10px;min-height:33px;font-size:12px;font-weight:800;cursor:pointer;
+}
+.rex-page[data-page="dashboard"] .rxah-health-header .rxag-cum-summary strong{
+  grid-column:1/-1;font-size:23px;line-height:1.3;
+}
+.rex-page[data-page="dashboard"] .rxah-health-header .rxag-cum-summary>span{white-space:nowrap}
+.rex-page[data-page="dashboard"] .rxah-legend{
+  display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:13px 0 9px;
+  color:#70849c;font-size:11px;font-weight:720;
+}
+.rex-page[data-page="dashboard"] .rxah-legend>span{display:inline-flex;align-items:center;gap:6px}
+.rex-page[data-page="dashboard"] .rxah-legend i{
+  display:inline-block;width:16px;height:0;border-top:3px solid;vertical-align:middle;
+}
+.rex-page[data-page="dashboard"] .rxah-legend .rxah-dot-up{border-color:#16835f}
+.rex-page[data-page="dashboard"] .rxah-legend .rxah-dot-down{border-color:#c34c52}
+.rex-page[data-page="dashboard"] .rxah-legend .rxah-dot-avg{
+  border-color:#7994b2;border-top-style:dashed;
+}
+.rex-page[data-page="dashboard"] .rxah-health-panel{background:#fcfeff}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-line{
+  fill:none;stroke-width:4.4;stroke-linejoin:round;stroke-linecap:round;
+}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-line.rxah-rising{stroke:#1b8d65}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-line.rxah-falling{stroke:#d05259}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-line.rxah-flat{stroke:#7896b7}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-line.rxah-neutral{stroke:#2c72b9}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-average{
+  fill:none;stroke:#879caf;stroke-width:2.6;stroke-dasharray:9 7;stroke-linecap:round;
+}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point{
+  stroke:#fff;stroke-width:2.7;fill:#2c72b9;
+}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point.rxah-rising{fill:#1b8d65}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point.rxah-falling{fill:#d05259}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point.rxah-flat{fill:#7896b7}
+.rex-page[data-page="dashboard"] .rxah-health-svg .rxah-health-point.rxah-latest{
+  stroke:#fff;stroke-width:3.3;filter:drop-shadow(0 0 3px rgba(31,79,125,.32))
+}
