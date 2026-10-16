@@ -67,7 +67,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       doc.body.appendChild(marker);
     }catch(e){}
 
-    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261015_08');return url.href;};
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261016_hotfix_01');return url.href;};
     const modules=[
       local('admin-seller.js?v=9'),
       local('weekly-forecast.js?v=5'),
@@ -81,7 +81,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/dashboard-sales-kpis.js?v=2'),
       local('beta/dashboard-live-sales.js?v=2'),
       local('beta/dashboard-agency-direct.js?v=5'),
-      local('beta/manager-strategy-analysis.js?v=1'),
       local('beta/manager-forecast-reliability.js?v=1'),
       local('beta/friday-crm-report-dashboard.js?v=3'),
       local('beta/forecast-tabs.js?v=2'),
@@ -119,23 +118,9 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-comment.js?v=1'),
       local('beta/friday-splus1-editor.js?v=5')
     ];
-    // Scripts classiques insérés dans l'ordre d'origine, async=false : le navigateur
-    // télécharge en parallèle, mais exécute dans l'ordre. Évite les 46 allers-retours
-    // réseau séquentiels responsables d'un démarrage lent.
-    // Précharger les feuilles de style en même temps que les scripts, tout en
-    // gardant leur insertion finale pour conserver les priorités CSS existantes.
-    for(const path of ['beta/monthly-visual-refresh.css?v=4','beta/dashboard-desktop-theme.css?v=7']){
-      const hint=doc.createElement('link');
-      hint.rel='preload';hint.as='style';hint.href=local(path);
-      doc.head.appendChild(hint);
-    }
-    const loading=modules.map(src=>addScript(doc,src));
-    const settled=await Promise.all(loading);
-    const failures=modules.filter((_,i)=>!settled[i]);
-    if(failures.length){
-      console.warn('[Rex CRM] Modules indisponibles :',failures);
-      bootText.textContent='Ouverture avec '+failures.length+' module(s) indisponible(s)…';
-    }
+    // Chargement séquentiel éprouvé : restauré après plantage signalé.
+    // Maintenir l'ordre et le temps d'initialisation de chaque module.
+    for(const src of modules)await addScript(doc,src);
     // Charger la présentation épurée dans l'iframe avant de l'afficher.
     // Le CSS est isolé au prévisionnel mensuel : aucune logique métier modifiée.
     const freshStyle=doc.createElement('link');
@@ -148,14 +133,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
     doc.head.appendChild(freshStyle);
     const desktopStyle=doc.createElement('link');
     desktopStyle.rel='stylesheet';
-    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=7');
+    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=6');
     const desktopReady=new Promise(resolve=>{
       desktopStyle.onload=()=>resolve(true);
       desktopStyle.onerror=()=>resolve(false);
     });
     doc.head.appendChild(desktopStyle);
     await Promise.race([Promise.all([styleReady,desktopReady]),sleep(3500)]);
-    // Le nettoyage du service worker est déjà effectué avant le chargement de l'iframe.
+    await unregisterWorkers();
   }
 
   await unregisterWorkers();
@@ -183,7 +168,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
   };
   frame.onerror=()=>{bootText.textContent='Impossible d’ouvrir l’application. Recharge la page.'};
   // Cache navigateur conservé entre ouvertures ; renouvellement à la publication.
-  frame.src=new URL('index.html?beta_frame=20261015_08',root).href;
+  frame.src=new URL('index.html?beta_frame='+Date.now(),root).href;
   setTimeout(()=>{
     if(frame.style.display!=='block')bootText.textContent='Chargement plus long que prévu… recharge la page si nécessaire.';
   },10000);
