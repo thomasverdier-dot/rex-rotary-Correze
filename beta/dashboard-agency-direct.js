@@ -336,7 +336,10 @@
           '<strong>'+(chart.latest==null?'—':format(chart.latest))+'</strong>'+
           '<span class="'+(chart.monthTrend==null?'neutral':chart.monthTrend>0?'up':chart.monthTrend<0?'down':'steady')+'">'+
             'M-1 : '+esc(trendLabel(chart.monthTrend))+'</span>'+
-          '<span class="rxag-cum-yoy">N-1 (même mois) : '+esc(trendLabel(previousAvailable))+'</span></div></div>'+
+          '<span class="rxag-cum-yoy">N-1 (même mois) : '+esc(trendLabel(previousAvailable))+'</span>'+
+          '<span class="rxah-health-baseline '+(chart.average==null?'neutral':chart.latest>=chart.average?'up':'down')+
+            '">Vs moyenne mobile 12 mois : '+esc(chart.average>0?trendLabel((chart.latest/chart.average-1)*100):'—')+
+          '</span></div></div>'+
       '<div class="rxah-legend"><span><i class="rxah-dot-up"></i>Progression M-1</span>'+
         '<span><i class="rxah-dot-down"></i>Baisse M-1</span>'+
         '<span><i class="rxah-dot-avg"></i>Moyenne mobile 12 mois'+
