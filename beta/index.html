@@ -71,6 +71,15 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
   async function injectBeta(){
     const doc=frame.contentDocument;
     if(!doc||!doc.body)return;
+    // Diagnostic du socle : aucun module additionnel chargé.
+    // N'altère pas la session ni les données enregistrées.
+    if(new URLSearchParams(location.search).get('core')==='1'){
+      const banner=doc.createElement('div');
+      banner.style.cssText='position:fixed;bottom:12px;right:12px;z-index:999999;background:#fff3cd;color:#664d03;border:1px solid #e5ba4a;border-radius:8px;padding:10px;font:13px Segoe UI,Arial;pointer-events:none';
+      banner.textContent='TEST SOCLE · Extensions suspendues';
+      doc.body.appendChild(banner);
+      return;
+    }
     try{
       const marker=doc.createElement('div');
       marker.style.cssText='position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial';
