@@ -62,7 +62,7 @@
     const team=aggregate(allRows.filter(r=>valid(r)&&r.week_start>=start&&r.week_start<=reference));
     return {list,team,start,end:reference,weeks:periodWeeks,completeSellers:list.filter(x=>x.complete).length};
   }
-  function insight(x,team){
+  function insight(x,benchmark){
     if(!x.weeks)return 'Aucun Point du vendredi catégorisé sur la période.';
     if(!x.reliable)return 'Premiers chiffres disponibles ; attendre au moins quatre semaines saisies pour tirer des conclusions.';
     const rank=[...CATS].sort((a,b)=>x.counts[b]-x.counts[a]);
@@ -72,7 +72,13 @@
     const mix=x.count>0&&x.counts[smallest]===0?
       'Aucune entrée '+LABEL[smallest]+' déclarée : vérifier si cela correspond au secteur. ':'';
     const incomplete=x.weeks<weeks?'Attention : '+x.coverage+' semaines renseignées seulement. ':'';
-    return incomplete+main+mix+
+    let relative='';
+    if(benchmark!=null&&benchmark>0){
+      if(x.averageCount>=benchmark*1.25)relative='Volume de projets par semaine au-dessus de la moyenne des commerciaux disposant d’au moins 4 semaines saisies. ';
+      else if(x.averageCount<=benchmark*.75)relative='Volume de projets par semaine sous la moyenne des commerciaux comparables : analyser le secteur et l’activité de détection. ';
+      else relative='Rythme de création proche de la moyenne des commerciaux comparables. ';
+    }
+    return incomplete+main+mix+relative+
       'Rythme observé : '+nfmt.format(x.averageCount)+' projet(s) et '+money(x.averageCents)+' par semaine renseignée.';
   }
   function panel(){
@@ -97,9 +103,11 @@
         '<div><small>UC · projets / k€</small><strong>'+(total.weeks?total.counts.uc+' / '+money(total.cents.uc):'—')+'</strong></div>'+
         '<div><small>RNV · projets / k€</small><strong>'+(total.weeks?total.counts.rnv+' / '+money(total.cents.rnv):'—')+'</strong></div></div>';
       if(empty)body+='<p class="rxpf-empty">Aucune affaire levée par catégorie n’a encore été renseignée pour cette période. Les anciennes « affaires créées » restent conservées mais ne sont pas réparties artificiellement entre NC, UC et RNV.</p>';
+      const eligible=data.list.filter(x=>x.reliable);
+      const benchmark=eligible.length>=2?eligible.reduce((v,x)=>v+x.averageCount,0)/eligible.length:null;
       body+='<div class="rxpf-scroll"><table class="rxpf-table"><thead><tr>'+
         '<th>Commercial</th><th>Semaines saisies</th><th>NC</th><th>UC</th><th>RNV</th>'+
-        '<th>TOTAL</th><th>Rythme par semaine saisie</th><th>Évolution vs période précédente</th></tr></thead><tbody>'+
+        '<th>TOTAL</th><th>Rythme par semaine saisie</th><th>Montant moyen par projet</th><th>Évolution vs période précédente</th></tr></thead><tbody>'+
         data.list.map(x=>{
           const bucket=k=>x.weeks?x.counts[k]+' projet(s)<small>'+money(x.cents[k])+'</small>':'—';
           const trend=x.trend==null?'—':(x.trend>0?'+':'')+nfmt.format(x.trend)+' %';
@@ -107,14 +115,15 @@
           return '<tr><th>'+esc(x.name)+'</th><td>'+x.coverage+(x.complete?'':' <small>partiel</small>')+'</td>'+
             CATS.map(k=>'<td>'+bucket(k)+'</td>').join('')+
             '<td>'+(x.weeks?'<b>'+x.count+' projet(s)</b><small>'+money(x.centsTotal)+'</small>':'—')+'</td>'+
-            '<td>'+(x.weeks?nfmt.format(x.averageCount)+' projet(s)<small>'+money(x.averageCents)+'</small>':'—')+'</td>'+
+            '<td>'+(x.weeks?nfmt.format(x.averageCount)+' projet(s)<small>'+money(x.averageCents)+'</small>':'—')+'</td>'+ 
+            '<td>'+money(x.averageTicket)+'</td>'+
             '<td class="'+cls+'">'+trend+'</td></tr>';
         }).join('')+'</tbody></table></div>';
       if(!empty){
         body+='<div class="rxpf-insights"><h5>Forces et points à surveiller</h5>'+
-          data.list.map(x=>'<p><b>'+esc(x.name)+' :</b> '+esc(insight(x,data.team))+'</p>').join('')+'</div>';
+          data.list.map(x=>'<p><b>'+esc(x.name)+' :</b> '+esc(insight(x,benchmark))+'</p>').join('')+'</div>';
       }
-      body+='<p class="rxpf-note">Les semaines non renseignées ne sont jamais considérées comme des zéros. Les variations sur deux périodes sont affichées seulement si les deux périodes sont complètes. <b>Portefeuille créé ≠ CA signé</b> : ces chiffres mesurent la détection de projets.</p>';
+      body+='<p class="rxpf-note">Les semaines non renseignées ne sont jamais considérées comme des zéros. Les variations sur deux périodes sont affichées seulement si les deux périodes sont complètes. La comparaison entre commerciaux tient compte des semaines saisies, pas des différences de secteur ou de maturité commerciale. <b>Portefeuille créé ≠ CA signé</b> : ces chiffres mesurent la détection de projets.</p>';
       el.innerHTML=first+body;
     }
     const selector=el.querySelector('#rxpfPeriod');
