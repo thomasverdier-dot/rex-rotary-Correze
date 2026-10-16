@@ -129,15 +129,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;fon
       local('beta/friday-seller-comment.js?v=1'),
       local('beta/friday-splus1-editor.js?v=5')
     ];
-    // Précharger en parallèle les ressources réseau sans changer leur ordre d'exécution.
-    // Le navigateur réutilise normalement les téléchargements lors de l'injection ordonnée.
-    for(const src of modules){
-      const hint=doc.createElement('link');
-      hint.rel='preload';
-      hint.as='script';
-      hint.href=src;
-      doc.head.appendChild(hint);
-    }
+    // Chargement ordonné sans préchargement massif (évite la saturation de Chrome).
     // Exécuter dans l'ordre : les modules dépendent les uns des autres.
     // Chaque module a un délai maximum pour éviter un écran bloqué indéfiniment.
     const failures=[];
