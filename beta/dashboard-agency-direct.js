@@ -52,7 +52,7 @@
   const page=()=>document.querySelector('.rex-page[data-page="dashboard"]');
   const section=()=>document.getElementById(ID);
   let year=current.getFullYear(),month=current.getMonth()+1,rows=[],loading=false,queue=false,editing=false,saving=false,
-    viewRange='all',showExtras=false,message='',messageType='ok',annualGoal=null,annualGoalError='',lastRequest=0,started=false,debounce=null,lastMarkup='';
+    viewRange='all',healthMetric='ca',showExtras=false,message='',messageType='ok',annualGoal=null,annualGoalError='',lastRequest=0,started=false,debounce=null,lastMarkup='';
 
   function parseKeuro(value){
     const raw=String(value??'').trim().replace(/[\s\u00a0\u202f]/g,'').replace(',','.');
@@ -104,99 +104,111 @@
     const pct=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(rounded);
     return value>0?'↗ +'+pct+' %':value<0?'↘ −'+pct+' %':'→ 0,0 %';
   }
-  function cumulativeArrowChart(monthly,allRows=[]){
-    const W=Math.max(1200,monthly.length*84+100),H=297,left=77,right=66,top=37,bottom=246;
-    const plotWidth=W-left-right,height=bottom-top;
-    const spacing=monthly.length>1?plotWidth/(monthly.length-1):0;
-    const x=i=>Math.round((left+i*spacing)*100)/100;
-    const y=(v,ceiling)=>Math.round((bottom-v/ceiling*height)*100)/100;
-    const fmtMonth=m=>MONTHS[m.month-1]+' '+m.year;
-    const entries=monthly.map((m,index)=>({m,index})).filter(p=>p.m.values!==null);
-    const trends=monthlyCATrends(monthly,allRows);
-    const trendItems=monthly.map((m,i)=>{
-      const t=trends[i],cls=t==null?'missing':t>0?'up':t<0?'down':'steady';
-      let tooltip='Évolution indisponible : premier mois, mois absent ou CA précédent nul.';
-      if(t!=null){
-        const previous=new Date(m.year,m.month-2,15,12);
-        tooltip=fmtMonth(m)+' : '+trendLabel(t)+' de CA mensuel par rapport à '+
-          MONTHS[previous.getMonth()]+' '+previous.getFullYear()+'.';
-      }
-      return '<div class="rxag-trend-item '+cls+'" title="'+esc(tooltip)+'">'+
-        '<span class="rxag-trend-value">'+esc(trendLabel(t))+'</span></div>';
-    }).join('');
-    const trendStart=Math.max(0,left-spacing/2),trendWidth=Math.max(0,spacing*monthly.length);
-    const trendStyle='grid-template-columns:repeat('+monthly.length+',minmax(0,1fr));'+
-      'margin-left:'+trendStart.toFixed(2)+'px;width:'+trendWidth.toFixed(2)+'px;padding:0;';
-    if(!entries.length)return {
-      svg:'<div class="rxag-cum-empty">Aucun chiffre d’agence renseigné sur cette période. Complète les mois historiques en k€ pour construire la courbe.</div>',
-      trends:'',latest:null,monthTrend:null,recorded:0,gaps:monthly.length,
-      width:W,trendStyle,lastIndex:-1
-    };
-    const maximum=Math.max(1,...entries.map(e=>e.m.cumulative.ca)),ceiling=maximum*1.12;
-    const points=entries.map(e=>({
-      x:x(e.index),y:y(e.m.cumulative.ca,ceiling),index:e.index,m:e.m
-    }));
-    const curve=(a,b)=>{
-      const dx=b.x-a.x;
-      return 'M '+a.x+' '+a.y+' C '+(a.x+dx*.37).toFixed(2)+' '+a.y+
-        ' '+(b.x-dx*.37).toFixed(2)+' '+b.y+' '+b.x+' '+b.y;
-    };
-    const grid=[0,.5,1].map(frac=>{
-      const posY=Math.round((bottom-frac*height)*100)/100;
-      return '<line class="rxag-cum-grid" x1="'+left+'" y1="'+posY+'" x2="'+(W-right)+'" y2="'+posY+'"/>'+
-        '<text class="rxag-cum-y" x="'+(left-12)+'" y="'+(posY+4)+'" text-anchor="end">'+
-        esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(ceiling*frac/100000))+'</text>';
-    }).join('');
-    const yearBoundaries=monthly.map((m,i)=>m.month===1&&i>0?'<line class="rxag-cum-year-line" x1="'+(x(i)-spacing/2).toFixed(2)+
-      '" y1="'+top+'" x2="'+(x(i)-spacing/2).toFixed(2)+'" y2="'+bottom+'"/>':'').join('');
-    const groups=[];let contiguous=[];
-    points.forEach(p=>{
-      if(contiguous.length&&p.index!==contiguous[contiguous.length-1].index+1){
-        groups.push(contiguous);contiguous=[];
-      }
-      contiguous.push(p);
+
+  // Courbe de santé : la valeur de chaque mois (CA/NC/UC), et non la somme
+  // cumulée. La moyenne mobile requiert 12 vrais mois, zéro déclaré accepté.
+  function healthTrend(monthly,history,indicator){
+    const by=new Map(history.map(r=>[String(r.month_start).slice(0,10),Number(r[indicator+'_cents'])]));
+    return monthly.map(m=>{
+      if(!m.values)return null;
+      const earlier=new Date(m.year,m.month-2,15,12);
+      const prior=by.get(dateISO(earlier.getFullYear(),earlier.getMonth()+1));
+      return prior==null||prior===0?null:(m.values[indicator]-prior)/prior*100;
     });
-    if(contiguous.length)groups.push(contiguous);
-    const areas=groups.filter(group=>group.length>1).map(group=>{
-      const steps=group.slice(1).map((p,i)=>curve(group[i],p).replace(/^M [\d.]+ [\d.]+ /,'')).join(' ');
-      return '<path class="rxag-cum-area" d="M '+group[0].x+' '+bottom+' L '+group[0].x+' '+group[0].y+' '+
-        steps+' L '+group[group.length-1].x+' '+bottom+' Z"/>';
-    }).join('');
-    const lines=points.slice(1).map((p,i)=>{
-      const prev=points[i],gap=p.index!==prev.index+1,last=i===points.length-2;
-      return '<path class="'+(gap?'rxag-cum-dashed':'rxag-cum-line')+'" d="'+curve(prev,p)+'"'+
-        (last?' marker-end="url(#rxagArrowhead)"':'')+'/>';
-    }).join('');
-    const circles=points.map((p,i)=>{
-      const last=i===points.length-1,trend=trends[p.index];
-      const tip=fmtMonth(p.m)+' · CA cumulé '+format(p.m.cumulative.ca)+
-        ' · CA mensuel '+format(p.m.values.ca)+' · Évolution M-1 : '+trendLabel(trend);
-      return '<circle class="'+(last?'rxag-cum-dot rxag-cum-latest':'rxag-cum-dot')+
-        '" cx="'+p.x+'" cy="'+p.y+'" r="'+(last?7:4.8)+'"><title>'+esc(tip)+'</title></circle>';
-    }).join('');
-    const dates=monthly.map((m,i)=>
+  }
+  function healthYearTrend(monthly,history,indicator){
+    const by=new Map(history.map(r=>[String(r.month_start).slice(0,10),Number(r[indicator+'_cents'])]));
+    return monthly.map(m=>{
+      if(!m.values)return null;
+      const prior=by.get(dateISO(m.year-1,m.month));
+      return prior==null||prior===0?null:(m.values[indicator]-prior)/prior*100;
+    });
+  }
+  function healthMovingAverages(monthly,history,indicator){
+    const by=new Map(history.map(r=>[String(r.month_start).slice(0,10),Number(r[indicator+'_cents'])]));
+    return monthly.map(m=>{
+      const d=new Date(m.year,m.month-12,15,12),values=[];
+      for(let i=0;i<12;i++){
+        const key=dateISO(d.getFullYear(),d.getMonth()+1),v=by.get(key);
+        if(v==null)return null;
+        values.push(v);
+        d.setMonth(d.getMonth()+1);
+      }
+      return values.reduce((acc,v)=>acc+v,0)/12;
+    });
+  }
+  function monthlyHealthChart(monthly,history=[],indicator='ca'){
+    const W=Math.max(1200,monthly.length*84+100),H=300,left=77,right=65,top=40,bottom=248;
+    const width=W-left-right,height=bottom-top,spacing=monthly.length>1?width/(monthly.length-1):0;
+    const x=i=>Math.round((left+i*spacing)*100)/100;
+    const deltas=healthTrend(monthly,history,indicator);
+    const yearDeltas=healthYearTrend(monthly,history,indicator);
+    const averages=healthMovingAverages(monthly,history,indicator);
+    const actual=monthly.map((m,i)=>({m,i,v:m.values?.[indicator]??null})).filter(p=>p.v!==null);
+    const moving=averages.map((v,i)=>({v,i})).filter(p=>vNotNull(p.v));
+    const topValue=Math.max(1,...actual.map(p=>p.v),...moving.map(p=>p.v)),max=topValue*1.12;
+    const y=v=>Math.round((bottom-v/max*height)*100)/100;
+    const label={ca:'CA',nc:'NC',uc:'UC'}[indicator];
+    const segment=(a,b)=>'M '+x(a.i)+' '+y(a.v)+' L '+x(b.i)+' '+y(b.v);
+    const chartDates=monthly.map((m,i)=>
       '<text class="rxag-cum-month'+(m.values?'':' rxag-cum-month-absent')+
       '" x="'+x(i)+'" y="'+(bottom+27)+'" text-anchor="middle">'+
       esc(MONTHS[m.month-1].slice(0,3))+' '+String(m.year).slice(-2)+'</text>'
     ).join('');
-    const latest=points[points.length-1],monthTrend=trends[latest.index];
-    const svg='<svg class="rxag-cum-svg" viewBox="0 0 '+W+' '+H+
+    const trendItems=monthly.map((m,i)=>{
+      const trend=deltas[i],cls=trend==null?'missing':trend>0?'up':trend<0?'down':'steady';
+      const tooltip=MONTHS[m.month-1]+' '+m.year+' · '+label+' : '+
+        (m.values?format(m.values[indicator]):'Non renseigné')+
+        ' · Variation par rapport au mois précédent : '+trendLabel(trend);
+      return '<div class="rxag-trend-item '+cls+'" title="'+esc(tooltip)+'">'+
+        '<span class="rxag-trend-value">'+esc(trendLabel(trend))+'</span></div>';
+    }).join('');
+    const trendStart=Math.max(0,left-spacing/2),trendWidth=spacing*monthly.length;
+    const trendStyle='grid-template-columns:repeat('+monthly.length+',minmax(0,1fr));'+
+      'margin-left:'+trendStart.toFixed(2)+'px;width:'+trendWidth.toFixed(2)+'px;padding:0;';
+    if(!actual.length)return {
+      svg:'<div class="rxag-cum-empty">Aucun chiffre '+label+' renseigné sur cette période. La courbe de santé apparaîtra après la saisie des résultats.</div>',
+      trends:'',trendStyle,width:W,gaps:monthly.length,latest:null,monthTrend:null,yearTrend:null,
+      average:null,lastIndex:-1,label
+    };
+    const grids=[0,.25,.5,.75,1].map(frac=>{
+      const yy=y(max*frac);
+      return '<line class="rxag-cum-grid" x1="'+left+'" y1="'+yy+'" x2="'+(W-right)+'" y2="'+yy+'"/>'+
+        '<text class="rxag-cum-y" x="'+(left-10)+'" y="'+(yy+4)+'" text-anchor="end">'+
+        esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(max*frac/100000))+'</text>';
+    }).join('');
+    const yearLines=monthly.map((m,i)=>m.month===1&&i>0?
+      '<line class="rxag-cum-year-line" x1="'+(x(i)-spacing/2).toFixed(2)+'" y1="'+top+
+      '" x2="'+(x(i)-spacing/2).toFixed(2)+'" y2="'+bottom+'"/>':'').join('');
+    const trendPaths=actual.slice(1).map((p,i)=>{
+      const old=actual[i];if(p.i!==old.i+1)return '';
+      const trend=deltas[p.i],klass=trend==null?'rxah-neutral':trend>0?'rxah-rising':trend<0?'rxah-falling':'rxah-flat';
+      return '<path class="rxah-health-line '+klass+'" d="'+segment(old,p)+'"/>';
+    }).join('');
+    const averagePaths=moving.slice(1).map((p,i)=>{
+      const old=moving[i];if(p.i!==old.i+1)return '';
+      return '<path class="rxah-health-average" d="'+segment(old,p)+'"/>';
+    }).join('');
+    const circles=actual.map((p,i)=>{
+      const trend=deltas[p.i],latest=i===actual.length-1;
+      const klass=trend==null?'rxah-neutral':trend>0?'rxah-rising':trend<0?'rxah-falling':'rxah-flat';
+      const tooltip=MONTHS[p.m.month-1]+' '+p.m.year+' · '+label+' mensuel '+format(p.v)+
+        ' · M-1 : '+trendLabel(trend)+' · N-1 : '+trendLabel(yearDeltas[p.i]);
+      return '<circle class="rxah-health-point '+klass+(latest?' rxah-latest':'')+
+        '" cx="'+x(p.i)+'" cy="'+y(p.v)+'" r="'+(latest?6.7:4.3)+'"><title>'+esc(tooltip)+'</title></circle>';
+    }).join('');
+    const latest=actual[actual.length-1];
+    const svg='<svg class="rxag-cum-svg rxah-health-svg" viewBox="0 0 '+W+' '+H+
       '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+
-      esc('Courbe du CA cumulé en k€, de '+fmtMonth(monthly[0])+' à '+fmtMonth(monthly[monthly.length-1])+
-        ', dernier cumul disponible '+format(latest.m.cumulative.ca)+
-        '. Évolution mensuelle en pourcentage sous la courbe.')+
+      esc('Courbe de santé mensuelle du '+label+' en k€. Valeurs mensuelles réelles avec hausses et baisses, moyenne mobile sur 12 mois en pointillés.')+
       '" xmlns="http://www.w3.org/2000/svg">'+
-      '<defs><linearGradient id="rxagCumulativeShade" x1="0" y1="0" x2="0" y2="1">'+
-      '<stop offset="0%" stop-color="#2879c7" stop-opacity=".22"/>'+
-      '<stop offset="100%" stop-color="#2879c7" stop-opacity=".015"/></linearGradient>'+
-      '<marker id="rxagArrowhead" viewBox="0 0 10 10" markerWidth="13" markerHeight="13" refX="9" refY="5" orient="auto">'+
-      '<path d="M 0 0 L 9 5 L 0 10 z" fill="#1764aa"/></marker></defs>'+
-      '<text class="rxag-cum-axis-title" x="'+left+'" y="18">CA CUMULÉ (k€)</text>'+
-      grid+yearBoundaries+areas+lines+circles+dates+'</svg>';
-    return {svg,trends:trendItems,latest:latest.m.cumulative.ca,monthTrend,recorded:entries.length,
-      gaps:monthly.length-entries.length,width:W,trendStyle,lastIndex:latest.index};
+      '<text class="rxag-cum-axis-title" x="'+left+'" y="17">'+label+' MENSUEL (k€)</text>'+
+      grids+yearLines+averagePaths+trendPaths+circles+chartDates+'</svg>';
+    return {svg,trends:trendItems,trendStyle,width:W,gaps:monthly.length-actual.length,
+      latest:latest.v,monthTrend:deltas[latest.i],yearTrend:yearDeltas[latest.i],
+      average:averages[latest.i],lastIndex:latest.i,label};
   }
-
+  function vNotNull(x){return x!==null&&Number.isFinite(x)}
   // Le diagnostic complet est chargé uniquement après clic, afin de conserver
   // le démarrage stable rétabli le 16/10/2026 (pas de nouveau script initial).
   let strategyRequest=null;
@@ -256,13 +268,13 @@
     const result=buildPeriod(rows,year,month,viewRange),selected=selectISO(year,month);
     const fiscal=fiscalStart(year,month),annual=goalProgress(result.monthly,annualGoal,fiscal,year,month);
     const percentage=annual.ratio==null?'—':new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(annual.ratio)+' %';
-    const chart=cumulativeArrowChart(result.monthly,rows);
-    const signature=JSON.stringify([rows,year,month,viewRange,editing,saving,showExtras,message,messageType,annualGoal,annualGoalError]);
+    const chart=monthlyHealthChart(result.monthly,rows,healthMetric);
+    const signature=JSON.stringify([rows,year,month,viewRange,healthMetric,editing,saving,showExtras,message,messageType,annualGoal,annualGoalError]);
     if(signature===lastMarkup&&el.querySelector('#rxAgencyMonth'))return;
     const label=k=>({ca:'CA',nc:'NC',uc:'UC'}[k]);
     const monthlyChanges=monthlyCATrends(result.monthly,rows),annualChanges=annualCATrends(result.monthly,rows);
     const periodLabel=viewRange==='all'?'depuis juillet 2023':'sur les 12 derniers mois';
-    const previousAvailable=chart.lastIndex>=0?annualChanges[chart.lastIndex]:null;
+    const previousAvailable=chart.yearTrend;
     const trendBadge=(trend)=>{
       const style=trend==null?'missing':trend>0?'up':trend<0?'down':'steady';
       return '<span class="rxag-table-trend '+style+'">'+esc(trendLabel(trend))+'</span>';
@@ -315,20 +327,30 @@
       '<div class="rxag-status"><strong>'+result.count+'/'+result.monthly.length+' mois renseignés</strong> · '+(result.complete?
         'Tous les mois de cette période sont renseignés.':'Cumul partiel : les mois non saisis ne sont jamais considérés comme 0 €.')+
         ' Les NC et UC sont compris dans le CA.</div>'+
-      '<div class="rxag-graph-head rxag-cum-header"><div><h4>↗ Progression du CA cumulé</h4>'+
-        '<p>Courbe du cumul en k€ depuis '+(viewRange==='all'?'juillet 2023':'les 12 derniers mois')+
-          ' ; sous chaque mois, l’évolution du CA mensuel par rapport au précédent.</p></div>'+
-        '<div class="rxag-cum-summary"><strong>'+(chart.latest==null?'—':format(chart.latest))+'</strong>'+
-        '<span class="'+(chart.monthTrend==null?'neutral':chart.monthTrend>0?'up':chart.monthTrend<0?'down':'steady')+'">'+
-          (chart.monthTrend==null?'Tendance mensuelle indisponible':trendLabel(chart.monthTrend)+' de CA mensuel')+
-        '</span><span class="rxag-cum-yoy">Vs même mois N-1 : '+esc(trendLabel(previousAvailable))+'</span></div></div>'+
-      '<div class="rxag-cum-panel">'+(viewRange==='all'?'<div class="rxag-scroll-hint">← Fais défiler le graphique horizontalement pour remonter jusqu’en juillet 2023</div>':'')+
+      '<div class="rxag-graph-head rxag-cum-header rxah-health-header"><div>'+
+        '<h4>Courbe de santé de l’agence · '+chart.label+' mensuel</h4>'+
+        '<p>Résultats mensuels réels en k€ : montées, baisses et moyenne mobile sur 12 mois. Le cumul reste disponible dans les indicateurs et le tableau.</p></div>'+
+        '<div class="rxag-cum-summary"><label for="rxAgencyHealthMetric">Indicateur</label>'+
+          '<select id="rxAgencyHealthMetric">'+metrics().map(k=>
+            '<option value="'+k+'" '+(healthMetric===k?'selected':'')+'>'+label(k)+'</option>').join('')+'</select>'+
+          '<strong>'+(chart.latest==null?'—':format(chart.latest))+'</strong>'+
+          '<span class="'+(chart.monthTrend==null?'neutral':chart.monthTrend>0?'up':chart.monthTrend<0?'down':'steady')+'">'+
+            'M-1 : '+esc(trendLabel(chart.monthTrend))+'</span>'+
+          '<span class="rxag-cum-yoy">N-1 (même mois) : '+esc(trendLabel(previousAvailable))+'</span>'+
+          '<span class="rxah-health-baseline '+(chart.average==null?'neutral':chart.latest>=chart.average?'up':'down')+
+            '">Vs moyenne mobile 12 mois : '+esc(chart.average>0?trendLabel((chart.latest/chart.average-1)*100):'—')+
+          '</span></div></div>'+
+      '<div class="rxah-legend"><span><i class="rxah-dot-up"></i>Progression M-1</span>'+
+        '<span><i class="rxah-dot-down"></i>Baisse M-1</span>'+
+        '<span><i class="rxah-dot-avg"></i>Moyenne mobile 12 mois'+
+          (chart.average==null?' (indisponible)':' : '+format(chart.average))+'</span></div>'+
+      '<div class="rxag-cum-panel rxah-health-panel">'+(viewRange==='all'?'<div class="rxag-scroll-hint">← Défiler pour consulter les mois depuis juillet 2023</div>':'')+
         '<div class="rxag-cum-scroll"><div class="rxag-cum-track" style="width:'+chart.width+'px">'+chart.svg+
-        (chart.trends?'<div class="rxag-trends" style="'+chart.trendStyle+'" aria-label="Évolution du CA mensuel en pourcentage">'+chart.trends+'</div>':'')+
+        (chart.trends?'<div class="rxag-trends" style="'+chart.trendStyle+'" aria-label="Variation mensuelle du '+chart.label+' en pourcentage">'+chart.trends+'</div>':'')+
       '</div></div></div>'+
-      '<div class="rxag-cum-explanation">La courbe bleue représente le <b>CA cumulé</b> : elle monte même quand l’activité ralentit. '+
-        'Les flèches <b>vertes ou rouges</b> indiquent une hausse ou baisse du <b>CA mensuel vs mois précédent</b>.'+
-        (chart.gaps?' <span>Les segments pointillés traversent des mois non renseignés : le cumul est partiel.</span>':'')+
+      '<div class="rxag-cum-explanation"><b>Lecture :</b> la courbe montre le '+chart.label+' réel de chaque mois, pas le cumul. '+
+        '<b>Vert</b> = hausse par rapport à M-1 ; <b>rouge</b> = baisse. La ligne en pointillés représente la moyenne mobile des 12 derniers mois complets.'+
+        (chart.gaps?' <span>Les mois non renseignés interrompent la courbe, sans être assimilés à 0 k€.</span>':'')+
       '</div>'+
       '<div class="rxag-table-head"><div><h4>Cumul et suivi mensuel</h4><p>'+result.monthly.length+
         ' mois, avec cumul progressif et comparaisons de CA M-1 / N-1.</p></div>'+
@@ -345,6 +367,15 @@
     // La vue historique s'ouvre sur les mois les plus récents ; on peut
     // toujours remonter jusqu'à juillet 2023 en faisant défiler à gauche.
     if(timeline&&viewRange==='all')timeline.scrollLeft=timeline.scrollWidth;
+    el.querySelector('#rxAgencyHealthMetric').onchange=e=>{
+      const next=e.target.value;
+      if(!metrics().includes(next)){e.target.value=healthMetric;return}
+      if(editing&&el.querySelector('.rxag-table-wrap')?.dataset.dirty==='1'){
+        notice('Enregistre ou annule les chiffres saisis avant de changer la courbe.','error');
+        e.target.value=healthMetric;return;
+      }
+      healthMetric=next;lastMarkup='';render();
+    };
     el.querySelector('#rxAgencyRange').onchange=e=>{
       const next=e.target.value;
       if(next!=='all'&&next!=='12')return;
