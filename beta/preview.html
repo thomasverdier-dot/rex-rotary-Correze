@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rex-Rotary Corrèze — Préversion</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0e2f68">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2f7;font-family:Segoe UI,Arial,sans-serif}
+#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#edf2f7;z-index:20}
+#boot>div{background:white;border:1px solid #d9e2ec;border-radius:18px;padding:24px 30px;box-shadow:0 20px 60px rgba(20,36,59,.12);min-width:360px}
+#boot h1{margin:0 0 7px;color:#0e2f68;font-size:26px}#boot p{margin:0;color:#667085;font-size:14px}
+#appFrame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#edf2f7;display:none}
+#betaBadge{position:fixed;right:12px;top:10px;z-index:999999;background:#10233f;color:#fff;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial;display:none}
+</style>
+</head>
+<body>
+<div id="boot"><div><h1>Rex-Rotary Corrèze</h1><p id="bootText">Ouverture de l’application…</p></div></div>
+<iframe id="appFrame" title="Rex-Rotary Corrèze"></iframe>
+<div id="betaBadge">BÊTA SANS SERVICE WORKER</div>
+<script>
+(async()=>{
+  const boot=document.getElementById('boot');
+  const bootText=document.getElementById('bootText');
+  const frame=document.getElementById('appFrame');
+  const badge=document.getElementById('betaBadge');
+  const root=new URL('../',location.href);
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+  async function unregisterWorkers(){
+    if(!('serviceWorker' in navigator))return false;
+    try{
+      const regs=await Promise.race([
+        navigator.serviceWorker.getRegistrations(),
+        new Promise(resolve=>setTimeout(()=>resolve([]),1500))
+      ]);
+      let had=false;
+      for(const reg of regs||[]){
+        if(String(reg.scope||'').includes('/rex-rotary-Correze/')){
+          had=true;
+          try{await reg.unregister()}catch(e){}
+        }
+      }
+      return had;
+    }catch(e){return false}
+  }
+
+  async function addScript(doc,src){
+    return new Promise(resolve=>{
+      const script=doc.createElement('script');
+      let finished=false;
+      const finish=ok=>{
+        if(finished)return;
+        finished=true;
+        clearTimeout(timer);
+        script.onload=null;
+        script.onerror=null;
+        if(!ok)script.remove();
+        resolve(ok);
+      };
+      const timer=setTimeout(()=>finish(false),src.includes('cdn.jsdelivr.net')?10000:7000);
+      script.src=src;
+      script.async=false;
+      script.onload=()=>finish(true);
+      script.onerror=()=>finish(false);
+      doc.body.appendChild(script);
+    });
+  }
+
+  async function injectBeta(){
+    const doc=frame.contentDocument;
+    if(!doc||!doc.body)return;
+    try{
+      const marker=doc.createElement('div');
+      marker.style.cssText='position:fixed;right:12px;top:10px;z-index:7000;background:#10233f;color:white;padding:6px 9px;border-radius:999px;font:700 10px Segoe UI,Arial';
+      marker.textContent='BÊTA SANS SERVICE WORKER';
+      doc.body.appendChild(marker);
+    }catch(e){}
+
+    const local=p=>{const url=new URL(p,root);url.searchParams.set('beta_build','20261016_hotfix_01');return url.href;};
+    const modules=[
+      local('admin-seller.js?v=9'),
+      local('weekly-forecast.js?v=5'),
+      local('beta/monthly-forecast.js?v=13'),
+
+      local('ui-v3.js?v=3'),
+      local('beta/admin-seller-management.js?v=1'),
+      local('beta/seller-action-dashboard.js?v=1'),
+      local('beta/admin-weekly-tasks.js?v=1'),
+      local('beta/seller-dashboard-tasks.js?v=4'),
+      local('beta/dashboard-sales-kpis.js?v=2'),
+      local('beta/dashboard-live-sales.js?v=2'),
+      local('beta/dashboard-agency-direct.js?v=8'),
+      local('beta/manager-forecast-reliability.js?v=1'),
+      local('beta/friday-crm-report-dashboard.js?v=3'),
+      local('beta/forecast-tabs.js?v=2'),
+      local('beta/forecast-form-wide.js?v=2'),
+      local('beta/fiscal-sales-tracking.js?v=1'),
+      local('beta/fiscal-sector-targets.js?v=3'),
+      local('beta/fiscal-1125.js?v=1'),
+      local('map-companies.js?v=2'),
+      local('beta/bort-sector4.js?v=1'),
+      local('beta/map-assign.js?v=1'),
+      local('beta/active-clients.js?v=1'),
+      local('beta/map-active-clients.js?v=1'),
+      local('beta/map-active-labels.js?v=1'),
+      local('beta/prospection-physique.js?v=1'),
+      local('tickets.js?v=1'),
+      local('beta/phoning.js?v=4'),
+      local('beta/prospect-row-replace.js?v=1'),
+      'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+      local('beta/prospect-excel-export.js?v=2'),
+      local('beta/friday-point-monday.js?v=2'),
+      local('beta/friday-weekly-entry.js?v=2'),
+      local('beta/friday-wide-nextweek.js?v=3'),
+      local('beta/monthly-manual-promotion.js?v=3'),
+      local('beta/friday-signed-deals.js?v=8'),
+      'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@0eeb53b8fc07332bd8a0397e53a5f2435703c7e8/friday-actions.js',
+      local('beta/friday-action-manager.js?v=1'),
+      local('beta/friday-checklist.js?v=3'),
+      local('beta/friday-full-report.js?v=4'),
+      'https://cdn.jsdelivr.net/gh/thomasverdier-dot/rex-rotary-Correze@47ed7bccd85be765f1b29734863dbf37d5901a90/company-update.js',
+      local('beta/nav-order.js?v=3'),
+      local('beta/friday-nav-guard.js?v=1'),
+      local('beta/prospection-menu.js?v=3'),
+      local('beta/friday-seller-accordion.js?v=1'),
+      local('beta/friday-readability.js?v=3'),
+      local('beta/friday-seller-comment.js?v=1'),
+      local('beta/friday-splus1-editor.js?v=5'),
+      local('beta/manager-navigation-light.js?v=1')
+    ];
+    // Chargement ordonné sans préchargement massif (évite la saturation de Chrome).
+    // Exécuter dans l'ordre : les modules dépendent les uns des autres.
+    // Chaque module a un délai maximum pour éviter un écran bloqué indéfiniment.
+    const failures=[];
+    for(const src of modules){
+      if(!await addScript(doc,src))failures.push(src);
+      // Le navigateur traite les interactions entre les modules, sans rafale de chargements.
+      await sleep(50);
+    }
+    if(failures.length){
+      console.warn('[Rex Beta] Modules non chargés',failures);
+      const notice=doc.createElement('div');
+      notice.style.cssText='position:fixed;bottom:16px;right:16px;z-index:999999;background:#fff3cd;color:#664d03;padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px #0002;font:13px Segoe UI,Arial';
+      notice.textContent='Certains modules n’ont pas pu être chargés. Vérifiez les fonctions avant toute saisie.';
+      doc.body.appendChild(notice);
+    }
+    // Charger la présentation épurée dans l'iframe avant de l'afficher.
+    // Le CSS est isolé au prévisionnel mensuel : aucune logique métier modifiée.
+    const freshStyle=doc.createElement('link');
+    freshStyle.rel='stylesheet';
+    freshStyle.href=local('beta/monthly-visual-refresh.css?v=4');
+    const styleReady=new Promise(resolve=>{
+      freshStyle.onload=()=>resolve(true);
+      freshStyle.onerror=()=>resolve(false);
+    });
+    doc.head.appendChild(freshStyle);
+    const desktopStyle=doc.createElement('link');
+    desktopStyle.rel='stylesheet';
+    desktopStyle.href=local('beta/dashboard-desktop-theme.css?v=8');
+    const desktopReady=new Promise(resolve=>{
+      desktopStyle.onload=()=>resolve(true);
+      desktopStyle.onerror=()=>resolve(false);
+    });
+    doc.head.appendChild(desktopStyle);
+    await Promise.race([Promise.all([styleReady,desktopReady]),sleep(3500)]);
+    await unregisterWorkers();
+  }
+
+  await unregisterWorkers();
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller && !sessionStorage.getItem('rexBetaDetached')){
+    sessionStorage.setItem('rexBetaDetached','1');
+    bootText.textContent='Nettoyage de l’ancien cache…';
+    await sleep(250);
+    location.replace(location.pathname+'?clean='+Date.now());
+    return;
+  }
+  sessionStorage.removeItem('rexBetaDetached');
+
+  frame.onload=async()=>{
+    // Ne montrer aucune interface ancienne pendant l'injection des modules bêta.
+    bootText.textContent='Préparation de votre espace…';
+    try{
+      await injectBeta();
+    }catch(e){
+      bootText.textContent='Une erreur est survenue au chargement. Recharge la page.';
+      return;
+    }
+    frame.style.display='block';
+    boot.style.display='none';
+    badge.style.display='none';
+  };
+  frame.onerror=()=>{bootText.textContent='Impossible d’ouvrir l’application. Recharge la page.'};
+  // Cache navigateur conservé entre ouvertures ; renouvellement à la publication.
+  frame.src=new URL('index.html?beta_frame='+Date.now(),root).href;
+  setTimeout(()=>{
+    if(frame.style.display!=='block')bootText.textContent='Chargement plus long que prévu… recharge la page si nécessaire.';
+  },10000);
+})();
+</script>
+</body>
+</html>
