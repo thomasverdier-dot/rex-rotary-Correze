@@ -82,8 +82,67 @@
     if(nc)nc.value=p?String(p.values.portfolio_nc_count):'';
   }
 
-  function activityForm(uid,a){const id='fp_'+uid.replaceAll('-','');return `<div class="fp-form" id="${id}"><b style="font-size:11px;color:#10233f">Mes chiffres de la semaine</b><div class="fp-form-grid" style="margin-top:7px"><div><label>Prospection physique</label><input class="physical" type="number" min="0" value="${Number(a.physical_prospecting||0)}"></div><div><label>Rendez-vous</label><input class="appointments" type="number" min="0" value="${Number(a.appointments||0)}"></div><div><label>Appels</label><input class="calls" type="number" min="0" value="${Number(a.calls||0)}"></div><div><label>Affaires créées</label><input class="deals" type="number" min="0" value="${Number(a.deals_created||0)}"></div><div><label>Dont NC</label><input class="nc" type="number" min="0" value="${Number(a.nc_deals||0)}"></div><div><label>Créations mois</label><input class="month" type="number" min="0" value="${Number(a.deals_created_month||0)}"></div><button class="fp-main-save" data-uid="${uid}">Enregistrer</button></div></div>`}
-  async function saveActivity(uid){const box=document.getElementById('fp_'+uid.replaceAll('-',''));if(!box)return;const row={user_id:uid,week_start:weekStart,physical_prospecting:Number(box.querySelector('.physical').value||0),appointments:Number(box.querySelector('.appointments').value||0),calls:Number(box.querySelector('.calls').value||0),deals_created:Number(box.querySelector('.deals').value||0),nc_deals:Number(box.querySelector('.nc').value||0),deals_created_month:Number(box.querySelector('.month').value||0),updated_at:new Date().toISOString()};if(row.nc_deals>row.deals_created){alert('Le nombre de NC ne peut pas dépasser le nombre total d’affaires créées.');return}const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});if(r.error){alert(r.error.message);return}await load();alert('Activité enregistrée pour le point vendredi.')}
+  function activityForm(uid,a){
+    const id='fp_'+uid.replaceAll('-','');
+    const fields=[
+      ['physical','Prospection physique','physical_prospecting'],
+      ['appointments','Rendez-vous','appointments'],
+      ['calls','Appels','calls'],
+      ['month','Créations dans le mois','deals_created_month']
+    ].map(([cls,label,col])=>
+      '<div><label>'+label+'</label><input class="'+cls+'" type="number" min="0" step="1" value="'+Number(a[col]||0)+'"></div>'
+    ).join('');
+    const cats=PORTFOLIO_TYPES.map(t=>
+      '<div class="fp-portfolio-category"><b>'+PORT_LABEL[t]+'</b>'+
+        '<label>Nombre de projets levés<input class="fp-p-'+t+'-count" type="text" inputmode="numeric" placeholder="0" value="'+
+          esc(a['portfolio_'+t+'_count']??'')+'"></label>'+
+        '<label>Montant potentiel (k€)<input class="fp-p-'+t+'-amount" type="text" inputmode="decimal" placeholder="0,00" value="'+
+          esc(pfKeInput(a['portfolio_'+t+'_cents']))+'"></label></div>'
+    ).join('');
+    return '<div class="fp-form" id="'+id+'"><b>Mes chiffres de la semaine</b>'+
+      '<div class="fp-form-grid" style="margin-top:7px">'+fields+
+        '<div class="fp-portfolio-form"><div class="fp-portfolio-title"><b>Projets entrés en portefeuille cette semaine</b>'+
+          '<small>Affaires détectées, pas encore signées. NC / UC / RNV, total calculé automatiquement.</small></div>'+
+          '<div class="fp-portfolio-categories">'+cats+'</div>'+
+          '<div class="fp-portfolio-live" role="status">Renseigne les 6 champs (0 si aucune affaire).</div></div>'+
+        '<button class="fp-main-save" data-uid="'+uid+'" type="button">Enregistrer mes chiffres de la semaine</button>'+
+      '</div><input type="hidden" class="deals" value="'+Number(a.deals_created||0)+'">'+
+      '<input type="hidden" class="nc" value="'+Number(a.nc_deals||0)+'"></div>';
+  }
+  async function saveActivity(uid){
+    const box=document.getElementById('fp_'+uid.replaceAll('-',''));
+    if(!box)return;
+    if(getProfile()?.role!=='seller'||getUser()?.id!==uid){
+      alert('Seul le vendeur peut renseigner son propre Point vendredi.');return;
+    }
+    const portfolio=pfFromForm(box);
+    if(!portfolio){
+      alert('Complète le nombre et le montant (en k€) des projets RNV, NC et UC, avec 0 si aucun projet. Deux décimales maximum.');
+      return;
+    }
+    const activity={physical_prospecting:Number(box.querySelector('.physical').value),
+      appointments:Number(box.querySelector('.appointments').value),
+      calls:Number(box.querySelector('.calls').value),
+      deals_created_month:Number(box.querySelector('.month').value)};
+    if(Object.values(activity).some(v=>!Number.isInteger(v)||v<0||v>100000)){
+      alert('Les autres indicateurs de la semaine doivent être des nombres entiers positifs ou nuls.');return;
+    }
+    const row={user_id:uid,week_start:weekStart,...activity,
+      deals_created:portfolio.totals.count,nc_deals:portfolio.values.portfolio_nc_count,
+      ...portfolio.values,updated_at:new Date().toISOString()};
+    const button=box.querySelector('.fp-main-save');
+    if(button?.disabled)return;
+    if(button){button.disabled=true;button.textContent='Enregistrement…'}
+    try{
+      const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});
+      if(r.error)throw r.error;
+      await load();
+      alert('Point vendredi enregistré : '+portfolio.totals.count+' projet(s) détecté(s), potentiel de '+pfKe(portfolio.totals.cents)+'.');
+    }catch(e){
+      alert('Enregistrement impossible : '+(e?.message||e));
+      if(button){button.disabled=false;button.textContent='Enregistrer mes chiffres de la semaine'}
+    }
+  }
   async function saveManager(uid,generate){const s=sellers.find(x=>x.user_id===uid),box=document.getElementById('fpm_'+uid.replaceAll('-',''));if(!s||!box)return;const current=activityFor(uid),comment=box.querySelector('.mgr-comment').value.trim(),actions=box.querySelector('.mgr-actions').value.trim();current.manager_comment=comment;current.agreed_actions=actions;const text=generate?buildCrmSummary(s):box.querySelector('.crm-summary').value.trim();const row={user_id:uid,week_start:weekStart,manager_comment:comment,agreed_actions:actions,crm_summary:text,summary_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};const r=await getSb().from('friday_activity').upsert(row,{onConflict:'user_id,week_start'});if(r.error){alert(r.error.message);return}box.querySelector('.crm-summary').value=text;const a=activities.find(x=>x.user_id===uid);if(a)Object.assign(a,row);else activities.push({...activityFor(uid),...row});if(generate)alert('Synthèse générée et enregistrée.')}
   async function copySummary(uid){const s=sellers.find(x=>x.user_id===uid),box=document.getElementById('fpm_'+uid.replaceAll('-',''));if(!s||!box)return;let text=box.querySelector('.crm-summary').value.trim();if(!text){await saveManager(uid,true);text=box.querySelector('.crm-summary').value.trim()}else await saveManager(uid,false);try{await navigator.clipboard.writeText(text);alert('Synthèse copiée. Tu peux la coller directement dans le CRM.')}catch(e){box.querySelector('.crm-summary').select();document.execCommand('copy');alert('Synthèse copiée. Tu peux la coller directement dans le CRM.')}}
   function render(){renderAdmin();const box=document.getElementById('fpCards');if(!box)return;box.innerHTML=sellers.length?sellers.map(s=>sellerCard(s)).join(''):'<div class="fp-empty">Aucun vendeur disponible.</div>';box.querySelectorAll('.fp-main-save').forEach(b=>b.onclick=()=>saveActivity(b.dataset.uid));box.querySelectorAll('.fp-summary-btn').forEach(b=>b.onclick=()=>saveManager(b.dataset.uid,true));box.querySelectorAll('.fp-copy').forEach(b=>b.onclick=()=>copySummary(b.dataset.uid))}
