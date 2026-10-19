@@ -151,5 +151,5 @@
   if(sig===lastKey&&(editing.size||dirtyDrafts.size||document.activeElement?.closest?.('.fp-edit-form')))return;
   if(newCard||sig!==lastKey||Date.now()-refreshAt>60000)load();
  }
- setInterval(tick,2500);window.addEventListener('load',()=>setTimeout(tick,1700));
+ setInterval(()=>{if(document.visibilityState==='visible'&&document.getElementById('rexFridayPage')?.classList.contains('active'))tick()},6000);window.addEventListener('load',()=>setTimeout(tick,1700));
 })();
