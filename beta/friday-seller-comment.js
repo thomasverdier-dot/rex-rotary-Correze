@@ -80,6 +80,6 @@
       list.forEach(card=>{const uid=id(card);if(uid)box(card,uid)});
     }
   }
-  setInterval(tick,1200);
+  setInterval(()=>{if(document.visibilityState==='visible'&&document.getElementById('rexFridayPage')?.classList.contains('active'))tick()},5000);
   window.addEventListener('load',()=>setTimeout(tick,1600));
 })();
