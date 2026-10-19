@@ -150,14 +150,29 @@
    sellers().forEach(configure);
    applyFilter();
  }
- function schedule(){if(state.pending)return;state.pending=true;setTimeout(()=>{state.pending=false;enhance()},60)}
+ let observer=null, watched=null;
+ function watch(){
+   if(observer&&watched?.isConnected)observer.observe(watched,{subtree:true,childList:true});
+ }
+ function schedule(){
+   if(state.pending)return;
+   state.pending=true;
+   setTimeout(()=>{
+     state.pending=false;
+     // Les changements produits par enhance() ne doivent pas déclencher une nouvelle passe.
+     observer?.disconnect();
+     try{enhance()}catch(e){console.error('[Rex Friday UI]',e)}
+     finally{watch()}
+   },120);
+ }
  function setup(){
    const root=document.getElementById(ROOT);if(!root)return false;
    if(root.dataset.fridayUiEnhanced==='1')return true;
    root.dataset.fridayUiEnhanced='1';
-   new MutationObserver(schedule).observe(root,{subtree:true,childList:true});
+   watched=root;
+   observer=new MutationObserver(schedule);
    document.getElementById('fpWeek')?.addEventListener('change',()=>{state.tab.clear();schedule()});
-   enhance();return true;
+   schedule();return true;
  }
  let tries=0;const timer=setInterval(()=>{tries++;if(setup()||tries>120)clearInterval(timer)},250);
  window.addEventListener('load',()=>setTimeout(setup,500));
